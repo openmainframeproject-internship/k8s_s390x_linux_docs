@@ -476,6 +476,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_worker_components">Worker Components</a></li>
 </ul>
 </li>
+<li><a href="#_references">References</a></li>
 </ul>
 </div>
 </div>
@@ -597,10 +598,31 @@ on Canonical Virtual Machines.</p>
 name the machines as <strong><em>k8s-master</em></strong> for the Master node and <strong><em>k8s-worker</em></strong> for the Worker node</p>
 </li>
 <li>
-<p>Resource allocation of the nodes &lt; <strong>Waiting for Mike&#8217;s opinion on what is best, based on my analysis</strong> &gt;</p>
+<p>SSH into the nodes and follow the below steps in the nodes specified across each step</p>
 </li>
 <li>
-<p>SSH into the nodes and follow the below steps in the nodes specified across each step</p>
+<p>Note down the IP addresses of both the nodes. In the context of this document, IP addresses of the nodes
+are as follows</p>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Node</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">IP</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Master</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><span class="red">192.168.100.218</span></p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Worker</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><span class="red">192.168.100.225</span></p></td>
+</tr>
+</tbody>
+</table>
 </li>
 <li>
 <p>Create a root password on both the worker nodes, to able to <em>scp</em></p>
@@ -1319,11 +1341,35 @@ sudo systemctl status kube-proxy --no-pager</pre>
 </div>
 </div>
 </div>
+<div class="sect1">
+<h2 id="_references">References</h2>
+<div class="sectionbody">
+<div class="ulist">
+<ul>
+<li>
+<p><a href="https://github.com/linux-on-ibm-z/docs/wiki/Building-etcd" class="bare">https://github.com/linux-on-ibm-z/docs/wiki/Building-etcd</a></p>
+</li>
+<li>
+<p><a href="https://icicimov.github.io/blog/kubernetes/Kubernetes-cluster-step-by-step/" class="bare">https://icicimov.github.io/blog/kubernetes/Kubernetes-cluster-step-by-step/</a></p>
+</li>
+<li>
+<p><a href="https://github.com/kelseyhightower/kubernetes-the-hard-way/tree/2983b28f13b294c6422a5600bb6f14142f5e7a26/docs" class="bare">https://github.com/kelseyhightower/kubernetes-the-hard-way/tree/2983b28f13b294c6422a5600bb6f14142f5e7a26/docs</a></p>
+</li>
+<li>
+<p><a href="https://nixaid.com/deploying-kubernetes-cluster-from-scratch/" class="bare">https://nixaid.com/deploying-kubernetes-cluster-from-scratch/</a></p>
+</li>
+<li>
+<p><a href="https://kubernetes.io" class="bare">https://kubernetes.io</a></p>
+</li>
+</ul>
+</div>
+</div>
+</div>
 </div>
 <div id="footer">
 <div id="footer-text">
 Version 1.0<br>
-Last updated 2018-06-11 22:40:20 IST
+Last updated 2018-06-12 23:51:31 IST
 </div>
 </div>
 </body>
