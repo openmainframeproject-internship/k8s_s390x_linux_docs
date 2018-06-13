@@ -437,21 +437,21 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div class="details">
 <span id="author" class="author">Rajula Vineet Reddy</span><br>
 <span id="email" class="email"><a href="mailto:rajula96reddy@gmail.com">rajula96reddy@gmail.com</a></span><br>
-<span id="revnumber">version 1.0,</span>
-<span id="revdate">2018-06-11</span>
+<span id="revnumber">version 1.2,</span>
+<span id="revdate">2018-06-13</span>
 </div>
 <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel1">
 <li><a href="#_versions_of_all_the_components_used">Versions of all the components used</a></li>
-<li><a href="#_kvm_setup">KVM Setup</a>
+<li><a href="#_kvm_setup">KVM Setup</a></li>
+<li><a href="#_setting_up_the_vms_before_installing_the_components">Setting up the VMs before installing the components</a></li>
+<li><a href="#_installing_kubernetes_binaries_on_the_nodes">Installing Kubernetes binaries on the Nodes</a>
 <ul class="sectlevel2">
-<li><a href="#_installing_using_kvm_on_linux_one_cc_and_sles12sp3">Installing &amp; Using KVM on Linux One CC and SLES12SP3</a></li>
-<li><a href="#_using_the_kvm_from_a_remote_machine">Using the KVM from a remote machine</a></li>
+<li><a href="#_method_1_using_tar_releases">Method 1 - Using tar releases</a></li>
+<li><a href="#_method_2_using_googleapi_links">Method 2 - Using googleapi links</a></li>
 </ul>
 </li>
-<li><a href="#_setting_up_the_vms_before_installing_the_components">Setting up the VMs before installing the components</a></li>
-<li><a href="#_installing_kubernetes_binaries_on_the_nodes">Installing Kubernetes binaries on the Nodes</a></li>
 <li><a href="#_creating_certificates_authentication_to_enable_secure_communication_across_all_the_kubernetes_components">Creating Certificates &amp; Authentication to enable secure communication across all the Kubernetes components</a>
 <ul class="sectlevel2">
 <li><a href="#_generating_certificates">Generating Certificates</a></li>
@@ -462,12 +462,14 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <ul class="sectlevel2">
 <li><a href="#_building_the_binaries">Building the binaries</a></li>
 <li><a href="#_running_etcd_as_a_systemd_service">Running Etcd as a systemd service</a></li>
+<li><a href="#_test_etcd_cluster">Test etcd cluster</a></li>
 </ul>
 </li>
 <li><a href="#_setting_up_flannel">Setting up Flannel</a>
 <ul class="sectlevel2">
 <li><a href="#_installing_flannel">Installing Flannel</a></li>
 <li><a href="#_running_flanneld_as_a_systemd_service">Running Flanneld as a systemd service</a></li>
+<li><a href="#_testing_flanneld">Testing flanneld</a></li>
 </ul>
 </li>
 <li><a href="#_setting_up_kubernetes_components">Setting up Kubernetes Components</a>
@@ -476,6 +478,14 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_worker_components">Worker Components</a></li>
 </ul>
 </li>
+<li><a href="#_testing_the_cluster">Testing the cluster</a>
+<ul class="sectlevel2">
+<li><a href="#_test_if_kuberenetes_api_server_is_running">Test if Kuberenetes Api Server is Running</a></li>
+<li><a href="#_test_if_the_node_is_registered">Test if the node is registered</a></li>
+<li><a href="#_deploy_ngninx">Deploy ngninx</a></li>
+</ul>
+</li>
+<li><a href="#_troubleshooting">Troubleshooting</a></li>
 <li><a href="#_references">References</a></li>
 </ul>
 </div>
@@ -485,103 +495,73 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div class="sectionbody">
 <div class="paragraph">
 <p><strong>Note:</strong> This setup documents running a two node (1 Master &amp; 1 Worker) Kubernetes Cluster
-on Canonical Virtual Machines.</p>
+on LinuxOne cloud using LinuxOne supported linux distribution <strong>Canonical Ubuntu 18.04</strong>.</p>
 </div>
 </div>
 </div>
 <div class="sect1">
 <h2 id="_versions_of_all_the_components_used">Versions of all the components used</h2>
 <div class="sectionbody">
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p>LinuxOne Instance running on <strong>SLES12SP3</strong> and <strong>LinuxONE-Medium</strong> flavor</p>
-</li>
-<li>
-<p>Ubuntu Virtual Machines running on <strong>18.04</strong></p>
-</li>
-<li>
-<p>Go <strong>1.10.2</strong></p>
-</li>
-<li>
-<p>Kubernetes <strong>1.10.0</strong></p>
-</li>
-<li>
-<p>Docker <strong>18.06.0</strong></p>
-</li>
-<li>
-<p>Etcd <strong>3.3.6</strong></p>
-</li>
-<li>
-<p>Flannel <strong>0.10.0</strong></p>
-</li>
-</ol>
+<div class="paragraph">
+<p>The cluster is based on <strong>docker</strong> as container run-time and the components are installed as <strong>systemd</strong> services
+with <strong>flannel</strong> as the overlay networking model. The versions of each components used are as follows</p>
 </div>
+<table class="tableblock frame-all grid-all" style="width: 70%;">
+<colgroup>
+<col style="width: 50%;">
+<col style="width: 50%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Component/ Infrastructure</th>
+<th class="tableblock halign-left valign-top">Version</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">LinuxOne Instance flavour</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">LinuxONE-Medium</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">LinuxOne Instance OS</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">SLES12SP3</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Ubuntu VMs</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">18.04</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Go</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1.10.2</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Kubernetes</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1.9.8</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Docker</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">18.06.0</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Etcd</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3.3.6</p></td>
+</tr>
+</tbody>
+<tfoot>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Flannel</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0.10.0</p></td>
+</tr>
+</tfoot>
+</table>
 </div>
 </div>
 <div class="sect1">
 <h2 id="_kvm_setup">KVM Setup</h2>
 <div class="sectionbody">
-<div class="sect2">
-<h3 id="_installing_using_kvm_on_linux_one_cc_and_sles12sp3">Installing &amp; Using KVM on Linux One CC and SLES12SP3</h3>
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p>Create a Linux One Community Cloud Account</p>
-</li>
-<li>
-<p>Create an instance using a key pair</p>
-</li>
-<li>
-<p>Start the instance</p>
-</li>
-<li>
-<p>SSH to the instance using the command <code><code>ssh -i key.pem linux1@&lt;ip&gt;</code></code></p>
-</li>
-<li>
-<p>Get root privileges using the command <code><code>sudo -i</code></code></p>
-</li>
-<li>
-<p>Install KVM tools and server using the command <code><code>zypper in -t pattern kvm_server kvm_tools</code></code></p>
-</li>
-<li>
-<p>Start libvirtd using the command <code><code>systemctl start libvirtd.service</code></code></p>
-</li>
-<li>
-<p>To verify installation run the command <code><code>virsh list --all</code></code>, this should return nothing as we did not create any VM as of now</p>
-</li>
-<li>
-<p>On your host system (your workspace machine you use, to access the cloud server), install the GUI manager <strong>Virtual Machine Manager</strong> or <strong>virt-manager</strong> using the command <code><code>sudo apt-get install virt-manager</code></code></p>
-</li>
-<li>
-<p>Give appropriate permissions using the command <code><code>usermod -G libvirt &lt;username&gt;</code></code> (here username = linux1)</p>
-</li>
-</ol>
-</div>
-</div>
-<div class="sect2">
-<h3 id="_using_the_kvm_from_a_remote_machine">Using the KVM from a remote machine</h3>
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p>From your host system, try connecting to the linux1 hypervisor using the command <code><code>virsh -c qemu+ssh://linux1@&lt;ip&gt;/system?keyfile=&lt;Key path&gt; list</code></code>. This will return the same as that of step 8 of installation.</p>
-</li>
-<li>
-<p>To simply the above command, go to the path <code><code>~/.config/libvirt/libvrit.conf</code></code>, if the path doesn&#8217;t exist create the path. In that file add the below contents<code>`uri_aliases=[
-"l1cc=qemu+ssh://linux1@&lt;ip&gt;/system?keyfile=&lt;Key path&gt;",
-]</code>`The alias word 'l1cc' can be changed anything upto the user</p>
-</li>
-<li>
-<p>Now you can run the <code><code>virsh ..</code></code> command as <code><code>virsh -c l`cc list</code></code></p>
-</li>
-<li>
-<p>To get the GUI run <code><code>virt-manager -c l1cc</code></code>. Given some time, remote hypervisor will be connected from your host machine</p>
-</li>
-<li>
-<p>Use the GUI, to first create a network, storage and then start a VM</p>
-</li>
-</ol>
-</div>
+<div class="paragraph">
+<p>Refer to this <a href="https://gist.github.com/rajula96reddy/a9065c75d0b7c1b9f5472e0d480f31eb">gist</a> to setup
+virtual machines using KVM on LinuxOne Community Cloud.</p>
 </div>
 </div>
 </div>
@@ -591,7 +571,7 @@ on Canonical Virtual Machines.</p>
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p>Create two virtual machines after setting up KVM as explained above and Install ubuntu on both the nodes</p>
+<p>Create two virtual machines after setting up KVM as explained above and install ubuntu on both the nodes</p>
 </li>
 <li>
 <p>Make sure to set the hostname of both the machines to differentiate one machine from the other. Preferably
@@ -603,29 +583,33 @@ name the machines as <strong><em>k8s-master</em></strong> for the Master node an
 <li>
 <p>Note down the IP addresses of both the nodes. In the context of this document, IP addresses of the nodes
 are as follows</p>
-<table class="tableblock frame-all grid-all stretch">
+<table class="tableblock frame-all grid-all" style="width: 50%;">
 <colgroup>
 <col style="width: 50%;">
 <col style="width: 50%;">
 </colgroup>
-<tbody>
+<thead>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Node</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">IP</p></td>
+<th class="tableblock halign-left valign-top">Node</th>
+<th class="tableblock halign-left valign-top">IP</th>
 </tr>
+</thead>
+<tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Master</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><span class="red">192.168.100.218</span></p></td>
 </tr>
+</tbody>
+<tfoot>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Worker</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><span class="red">192.168.100.225</span></p></td>
 </tr>
-</tbody>
+</tfoot>
 </table>
 </li>
 <li>
-<p>Create a root password on both the worker nodes, to able to <em>scp</em></p>
+<p>Enable and create a root password on the worker node(s), to able to <em>scp</em> later</p>
 <div class="literalblock">
 <div class="content">
 <pre>sudo passwd root</pre>
@@ -633,7 +617,7 @@ are as follows</p>
 </div>
 </li>
 <li>
-<p>Install <strong>Go</strong> on the Master node</p>
+<p>Install <strong>Go</strong> on the Master node. Go installation is needed to build <strong>etcd</strong> in the later stages</p>
 <div class="literalblock">
 <div class="content">
 <pre>wget [https://dl.google.com/go/go1.10.2.linux-s390x.tar.gz](https://dl.google.com/go/go1.10.2.linux-s390x.tar.gz)
@@ -644,7 +628,9 @@ source /etc/profile</pre>
 </div>
 </li>
 <li>
-<p>Install vim, git on both the nodes</p>
+<p>Install vim, git, net-tools on both the nodes. Vim is needed to edit files, although preinstalled nano can be used.
+Git is needed to download source code for compilation in the later stages. Net-tools is needed to test and troubleshoot
+working of <strong>flannel</strong>.</p>
 <div class="literalblock">
 <div class="content">
 <pre>sudo apt-get -y install vim git net-tools</pre>
@@ -652,7 +638,7 @@ source /etc/profile</pre>
 </div>
 </li>
 <li>
-<p>Install docker on both the nodes</p>
+<p>Install docker on all the nodes.</p>
 <div class="literalblock">
 <div class="content">
 <pre>cd ~/Downloads
@@ -665,7 +651,7 @@ sudo dpkg -i docker-ce*
 </div>
 </li>
 <li>
-<p>Create folders</p>
+<p>Create the below folders in order to save certificates &amp; configuration files later</p>
 <div class="ulist">
 <ul>
 <li>
@@ -680,7 +666,7 @@ sudo mkdir -p</pre>
 </div>
 </li>
 <li>
-<p>On Worker Node</p>
+<p>On Worker Node(s)</p>
 <div class="literalblock">
 <div class="content">
 <pre>sudo mkdir -p /srv/kubernetes
@@ -699,11 +685,15 @@ sudo mkdir /var/lib/flanneld/</pre>
 <div class="sect1">
 <h2 id="_installing_kubernetes_binaries_on_the_nodes">Installing Kubernetes binaries on the Nodes</h2>
 <div class="sectionbody">
+<div class="sect2">
+<h3 id="_method_1_using_tar_releases">Method 1 - Using tar releases</h3>
+<div class="paragraph">
+<p>It is important to set the <strong>KUBERNETES_SERVER_ARCH</strong> to <strong>s390x</strong> in this step. Run the following on the Master node</p>
+</div>
 <div class="literalblock">
 <div class="content">
-<pre># Run the following on the Master node
-cd ~/Downloads
-wget https://dl.k8s.io/v1.10.0/kubernetes.tar.gz
+<pre>cd ~/Downloads
+wget https://dl.k8s.io/v1.9.8/kubernetes.tar.gz
 tar -xvf kubernetes.tar.gz
 cd kubernetes/cluster
 export KUBERNETES_SERVER_ARCH=s390x
@@ -711,9 +701,28 @@ export KUBERNETES_SERVER_ARCH=s390x
 cd server
 tar -xvf kubernetes-server-linux-s390x.tar.gz
 sudo cp server/kubernetes/server/bin/{kubectl,kube-apiserver,kube-controller-manager,kube-scheduler} /usr/local/bin
-sudo scp server/kubernetes/server/bin/{kubelet,kube-proxy} k8s-worker@192.168.100.225:~/
-# Run the next line on the worker
-sudo cp ~/{kubelet,kube-proxy} /usr/local/bin</pre>
+sudo scp server/kubernetes/server/bin/{kubelet,kube-proxy} root@192.168.100.225:/usr/local/bin</pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_method_2_using_googleapi_links">Method 2 - Using googleapi links</h3>
+<div class="paragraph">
+<p>The binaries can also be directly downloaded from the official googleapi links. Run the following
+commands on the Master node</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>cd ~/Downloads
+wget https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/s390x/kubelet
+wget https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/s390x/kube-apiserver
+wget https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/s390x/kube-controller-manager
+wget https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/s390x/kube-scheduler
+wget https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/s390x/kubelet
+wget https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/s390x/kube-proxy
+sudo cp kubectl kube-apiserver kube-controller-manager kube-scheduler /usr/local/bin
+sudo scp kubelet kube-proxy root@192.168.100.225:/usr/local/bin</pre>
+</div>
 </div>
 </div>
 </div>
@@ -722,7 +731,7 @@ sudo cp ~/{kubelet,kube-proxy} /usr/local/bin</pre>
 <h2 id="_creating_certificates_authentication_to_enable_secure_communication_across_all_the_kubernetes_components">Creating Certificates &amp; Authentication to enable secure communication across all the Kubernetes components</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>Run all the following steps and there by generate the files in the Master node, and then copy the
+<p>Run all the following steps and thereby generate the files in the Master node, and then copy the
 specific mentioned certs and config files to the worker nodes.</p>
 </div>
 <div class="sect2">
@@ -906,7 +915,7 @@ openssl x509 -req -sha256 -CA ca.pem -CAkey ca-key.pem -CAcreateserial \
 <div class="literalblock">
 <div class="content">
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218:6443
 kubectl config set-credentials admin --client-certificate=/srv/kubernetes/admin.pem --client-key=/srv/kubernetes/admin-key.pem --embed-certs=true --token=$TOKEN
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=admin
 kubectl config use-context linux1.k8s
@@ -920,7 +929,7 @@ cat ~/.kube/config #Create config file</pre>
 <div class="content">
 <pre>sudo mkdir -p /var/lib/kube-controller-manager
 TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218 --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218:6443 --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
 kubectl config set-credentials kube-controller-manager --client-certificate=/srv/kubernetes/kube-controller-manager.pem --client-key=/srv/kubernetes/kube-controller-manager-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-controller-manager --kubeconfig=/var/lib/kube-controller-manager/kubeconfig; kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-controller-manager/kubeconfig</pre>
 </div>
@@ -932,7 +941,7 @@ kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-controlle
 <div class="content">
 <pre>sudo mkdir -p /var/lib/kube-controller-manager
 TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218 --kubeconfig=/var/lib/kube-scheduler/kubeconfig
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218:6443 --kubeconfig=/var/lib/kube-scheduler/kubeconfig
 kubectl config set-credentials kube-scheduler --client-certificate=/srv/kubernetes/kube-scheduler.pem --client-key=/srv/kubernetes/kube-scheduler-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/var/lib/kube-scheduler/kubeconfig
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-scheduler --kubeconfig=/var/lib/kube-scheduler/kubeconfig; kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-scheduler/kubeconfig</pre>
 </div>
@@ -943,7 +952,7 @@ kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-scheduler
 <div class="literalblock">
 <div class="content">
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218 --kubeconfig=kubelet.kubeconfig
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218:6443 --kubeconfig=kubelet.kubeconfig
 kubectl config set-credentials kubelet --client-certificate=/srv/kubernetes/kubelet.pem --client-key=/srv/kubernetes/kubelet-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=kubelet.kubeconfig
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kubelet --kubeconfig=/var/lib/kubelet/kubeconfig; kubectl config use-context linux1.k8s --kubeconfig=kubelet.kubeconfig
 scp kube-proxy.kubeconfig root@192.168.100.225:/var/lib/kubelet/kubeconfig</pre>
@@ -955,7 +964,7 @@ scp kube-proxy.kubeconfig root@192.168.100.225:/var/lib/kubelet/kubeconfig</pre>
 <div class="literalblock">
 <div class="content">
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218 --kubeconfig=kube-proxy.kubeconfig
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218:6443 --kubeconfig=kube-proxy.kubeconfig
 kubectl config set-credentials kube-proxy --client-certificate=/srv/kubernetes/kube-proxy.pem --client-key=/srv/kubernetes/kube-proxy-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=kube-proxy.kubeconfig
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-proxy --kubeconfig=/var/lib/kube-proxy/kubeconfig; kubectl config use-context linux1.k8s --kubeconfig=kube-proxy.kubeconfig
 scp kube-proxy.kubeconfig root@192.168.100.225:/var/lib/kube-proxy/kubeconfig</pre>
@@ -978,7 +987,7 @@ git clone git://github.com/coreos/etcd
 cd etcd
 git checkout v3.3.6
 ./build
-./test (optional)
+./test #(optional)
 cp /bin/* /usr/local/bin</pre>
 </div>
 </div>
@@ -1017,6 +1026,17 @@ Restart=always
 RestartSec=10s
 LimitNOFILE=40000</pre>
 </div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_test_etcd_cluster">Test etcd cluster</h3>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>etcdctl --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem cluster-health</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>This should return <strong>cluster is healthy</strong> if etcd is running correctly.</p>
 </div>
 </div>
 </div>
@@ -1141,6 +1161,14 @@ sudo systemctl stop docker
 sudo systemctl start docker</pre>
 </div>
 </div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_testing_flanneld">Testing flanneld</h3>
+<div class="paragraph">
+<p>Once <strong>flanneld</strong> is started and <strong>docker</strong> daemon is restarted, running <code><code>route -n</code></code> on Master node
+and Worker node(s) the bridge established can be seen with the interface name as 'flannelx'. Also
+the IP of the nodes on the flannel networks can be seen by running <code><code>ip a</code></code> on all the nodes.</p>
 </div>
 </div>
 </div>
@@ -1342,6 +1370,61 @@ sudo systemctl status kube-proxy --no-pager</pre>
 </div>
 </div>
 <div class="sect1">
+<h2 id="_testing_the_cluster">Testing the cluster</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Now that we have deployed the cluster let&#8217;s test it.</p>
+</div>
+<div class="sect2">
+<h3 id="_test_if_kuberenetes_api_server_is_running">Test if Kuberenetes Api Server is Running</h3>
+<div class="paragraph">
+<p>Running <code><code>kubectl version</code></code> should return the version of both kubectl and kube-api-server</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>Client Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.8", GitCommit:"c138b85178156011dc934c2c9f4837476876fb07", GitTreeState:"clean", BuildDate:"2018-05-21T19:01:12Z", GoVersion:"go1.9.3", Compiler:"gc", Platform:"linux/s390x"}
+Server Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.8", GitCommit:"c138b85178156011dc934c2c9f4837476876fb07", GitTreeState:"clean", BuildDate:"2018-05-21T18:53:18Z", GoVersion:"go1.9.3", Compiler:"gc", Platform:"linux/s390x"}</pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_test_if_the_node_is_registered">Test if the node is registered</h3>
+<div class="paragraph">
+<p>Running <code><code>kubectl get nodes</code></code> should return the nodes sucessfully registered with the server and status of each node.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>NAME         STATUS    ROLES     AGE       VERSION
+k8s-worker   Ready     &lt;none&gt;    6d        v1.9.8</pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_deploy_ngninx">Deploy ngninx</h3>
+<div class="paragraph">
+<p>Let&#8217;s run an Ngnix app on the cluster.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>kubectl run nginx --image=nginx --port=80 --replicas=3
+kubectl get pods -o wide
+kubectl expose deployment nginx --type NodePort
+NODE_PORT=$(kubectl get svc nginx --output=jsonpath='{range .spec.ports[0]}{.nodePort}')
+curl http://192.168.100.225:${NODE_PORT} #The IP is of Worker node</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_troubleshooting">Troubleshooting</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>&lt;WIP&gt;</p>
+</div>
+</div>
+</div>
+<div class="sect1">
 <h2 id="_references">References</h2>
 <div class="sectionbody">
 <div class="ulist">
@@ -1368,8 +1451,8 @@ sudo systemctl status kube-proxy --no-pager</pre>
 </div>
 <div id="footer">
 <div id="footer-text">
-Version 1.0<br>
-Last updated 2018-06-12 23:51:31 IST
+Version 1.2<br>
+Last updated 2018-06-13 17:30:55 IST
 </div>
 </div>
 </body>
