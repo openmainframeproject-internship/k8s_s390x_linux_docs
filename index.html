@@ -620,7 +620,7 @@ are as follows</p>
 <p>Install <strong>Go</strong> on the Master node. Go installation is needed to build <strong>etcd</strong> in the later stages</p>
 <div class="literalblock">
 <div class="content">
-<pre>wget [https://dl.google.com/go/go1.10.2.linux-s390x.tar.gz](https://dl.google.com/go/go1.10.2.linux-s390x.tar.gz)
+<pre>wget https://dl.google.com/go/go1.10.2.linux-s390x.tar.gz
 tar -C /usr/local -xzf go1.10.2.linux-s390x.tar.gz
 echo 'export PATH=$PATH:/usr/local/go/bin' &gt;&gt; /etc/profile
 source /etc/profile</pre>
@@ -642,10 +642,10 @@ working of <strong>flannel</strong>.</p>
 <div class="literalblock">
 <div class="content">
 <pre>cd ~/Downloads
-wget [https://download.docker.com/linux/ubuntu/dists/bionic/pool/nightly/s390x/docker-ce_18.06.0~ce~dev~git20180604.170905.0.7841994-0~ubuntu_s390x.deb](https://download.docker.com/linux/ubuntu/dists/bionic/pool/nightly/s390x/docker-ce_18.06.0~ce~dev~git20180604.170905.0.7841994-0~ubuntu_s390x.deb)
+wget https://download.docker.com/linux/ubuntu/dists/bionic/pool/nightly/s390x/docker-ce_18.06.0~ce~dev~git20180604.170905.0.7841994-0~ubuntu_s390x.deb
 sudo apt-get install libltdl7 #docker dependency
 sudo dpkg -i docker-ce*
-# sudo systemctl enable docker.service
+sudo systemctl enable docker.service
 # sudo systemctl start docker.service</pre>
 </div>
 </div>
@@ -678,7 +678,16 @@ sudo mkdir /var/lib/flanneld/</pre>
 </ul>
 </div>
 </li>
+<li>
+<p>Disable swap space on all the nodes, which can be done by</p>
+</li>
 </ol>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>swapoff -a
+sudo sed -i 's/\/swapfile/#\/swapfile/g' /etc/fstab</pre>
+</div>
 </div>
 </div>
 </div>
@@ -714,7 +723,7 @@ commands on the Master node</p>
 <div class="literalblock">
 <div class="content">
 <pre>cd ~/Downloads
-wget https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/s390x/kubelet
+wget https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/s390x/kubectl
 wget https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/s390x/kube-apiserver
 wget https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/s390x/kube-controller-manager
 wget https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/s390x/kube-scheduler
@@ -1193,11 +1202,11 @@ EnvironmentFile=-/var/lib/flanneld/subnet.env
 #User=kube
 ExecStart=/usr/local/bin/kube-apiserver \
  --bind-address=0.0.0.0 \
- --advertise_address=192.168.100.218 \
+ --advertise-address=192.168.100.218 \
  --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota \
  --allow-privileged=true \
  --anonymous-auth=false \
- --apiserver-count=3 \
+ --apiserver-count=1 \
  --authorization-mode=RBAC,AlwaysAllow \
  --authorization-rbac-super-user=admin \
  --etcd-cafile=/srv/kubernetes/ca.pem \
@@ -1215,7 +1224,7 @@ ExecStart=/usr/local/bin/kube-apiserver \
  --runtime-config=api/all=true,batch/v2alpha1=true,rbac.authorization.k8s.io/v1alpha1=true \
  --secure-port=6443 \
  --service-cluster-ip-range=100.65.0.0/24 \
- --storage-backend=etcd2 \
+ --storage-backend=etcd3 \
  --tls-cert-file=/srv/kubernetes/apiserver.pem \
  --tls-private-key-file=/srv/kubernetes/apiserver-key.pem \
  --tls-ca-file=/srv/kubernetes/ca.pem \
@@ -1452,7 +1461,7 @@ curl http://192.168.100.225:${NODE_PORT} #The IP is of Worker node</pre>
 <div id="footer">
 <div id="footer-text">
 Version 1.2<br>
-Last updated 2018-06-13 17:30:55 IST
+Last updated 2018-06-17 01:00:14 IST
 </div>
 </div>
 </body>
