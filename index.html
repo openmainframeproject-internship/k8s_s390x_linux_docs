@@ -438,7 +438,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <span id="author" class="author">Rajula Vineet Reddy</span><br>
 <span id="email" class="email"><a href="mailto:rajula96reddy@gmail.com">rajula96reddy@gmail.com</a></span><br>
 <span id="revnumber">version 1.2,</span>
-<span id="revdate">2018-06-13</span>
+<span id="revdate">2018-06-18</span>
 </div>
 <div id="toc" class="toc">
 <div id="toctitle">Table of Contents</div>
@@ -481,6 +481,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_testing_the_cluster">Testing the cluster</a>
 <ul class="sectlevel2">
 <li><a href="#_test_if_kuberenetes_api_server_is_running">Test if Kuberenetes Api Server is Running</a></li>
+<li><a href="#_test_if_all_the_components_are_healthy">Test if all the components are healthy</a></li>
 <li><a href="#_test_if_the_node_is_registered">Test if the node is registered</a></li>
 <li><a href="#_deploy_ngninx">Deploy ngninx</a></li>
 </ul>
@@ -679,7 +680,8 @@ sudo mkdir /var/lib/flanneld/</pre>
 </div>
 </li>
 <li>
-<p>Disable swap space on all the nodes, which can be done by</p>
+<p>Kubernetes is not currently designed to work with swap memory on.
+Disable swap space on all the nodes, by running</p>
 </li>
 </ol>
 </div>
@@ -749,8 +751,7 @@ specific mentioned certs and config files to the worker nodes.</p>
 <h4 id="_ca_certificate_authority">CA - Certificate Authority</h4>
 <div class="literalblock">
 <div class="content">
-<pre>mkdir -p /srv/kubernetes
-cd /srv/kubernetes
+<pre>cd /srv/kubernetes
 openssl genrsa -out ca-key.pem 2048
 openssl req -x509 -new -nodes -key ca-key.pem -days 10000 -out ca.pem -subj "/CN=kube-ca"</pre>
 </div>
@@ -904,7 +905,7 @@ EOF</pre>
 <pre>openssl genrsa -out etcd.key 2048
 openssl req -new -key etcd.key -out etcd.csr -subj "/CN=etcd" -extensions v3_req -config etcd-openssl.cnf -sha256
 openssl x509 -req -sha256 -CA ca.pem -CAkey ca-key.pem -CAcreateserial \
-  -in etcd.csr -out etcd.crt -extensions v3_req -extfile openssl-etcd.cnf -days 7200</pre>
+  -in etcd.csr -out etcd.crt -extensions v3_req -extfile etcd-openssl.cnf -days 7200</pre>
 </div>
 </div>
 </div>
@@ -936,8 +937,7 @@ cat ~/.kube/config #Create config file</pre>
 <h4 id="_kube_controller_manager_kubeconfig">Kube-controller-manager Kubeconfig</h4>
 <div class="literalblock">
 <div class="content">
-<pre>sudo mkdir -p /var/lib/kube-controller-manager
-TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
+<pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
 kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218:6443 --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
 kubectl config set-credentials kube-controller-manager --client-certificate=/srv/kubernetes/kube-controller-manager.pem --client-key=/srv/kubernetes/kube-controller-manager-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-controller-manager --kubeconfig=/var/lib/kube-controller-manager/kubeconfig; kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-controller-manager/kubeconfig</pre>
@@ -948,8 +948,7 @@ kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-controlle
 <h4 id="_kube_scheduler_kubeconfig">Kube-scheduler Kubeconfig</h4>
 <div class="literalblock">
 <div class="content">
-<pre>sudo mkdir -p /var/lib/kube-controller-manager
-TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
+<pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
 kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218:6443 --kubeconfig=/var/lib/kube-scheduler/kubeconfig
 kubectl config set-credentials kube-scheduler --client-certificate=/srv/kubernetes/kube-scheduler.pem --client-key=/srv/kubernetes/kube-scheduler-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/var/lib/kube-scheduler/kubeconfig
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-scheduler --kubeconfig=/var/lib/kube-scheduler/kubeconfig; kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-scheduler/kubeconfig</pre>
@@ -990,14 +989,15 @@ scp kube-proxy.kubeconfig root@192.168.100.225:/var/lib/kube-proxy/kubeconfig</p
 <h3 id="_building_the_binaries">Building the binaries</h3>
 <div class="literalblock">
 <div class="content">
-<pre>cd $GO_PATH/src/
+<pre>cd /usr/local/bin/go/src/
 mkdir -p github.com/coreos
+cd github.com/coreos
 git clone git://github.com/coreos/etcd
 cd etcd
 git checkout v3.3.6
 ./build
 ./test #(optional)
-cp /bin/* /usr/local/bin</pre>
+cp bin/* /usr/local/bin</pre>
 </div>
 </div>
 </div>
@@ -1012,28 +1012,33 @@ Documentation=https://github.com/coreos/etcd
 
 [Service]
 Environment="ETCD_UNSUPPORTED_ARCH=s390x"
-ExecStart=/usr/local/bin/etcd \
- --name master \
- --cert-file=/srv/kubernetes/etcd.crt \
- --key-file=/srv/kubernetes/etcd.key \
- --peer-cert-file=/srv/kubernetes/etcd.crt \
- --peer-key-file=/srv/kubernetes/etcd.key \
- --trusted-ca-file=/srv/kubernetes/ca.pem \
- --peer-trusted-ca-file=/srv/kubernetes/ca.pem \
- --peer-client-cert-auth \
- --client-cert-auth \
- --initial-advertise-peer-urls https://192.168.100.218:2380 \
- --listen-peer-urls https://192.168.100.218:2380 \
- --listen-client-urls https://192.168.100.218:2379,http://127.0.0.1:2379 \
- --advertise-client-urls https://192.168.100.218:2379 \
- --initial-cluster-token etcd-cluster-0 \
- --initial-cluster master=https://192.168.100.218:2380 \
- --initial-cluster-state new \
- --data-dir=/var/lib/etcd \
+ExecStart=/usr/local/bin/etcd \\
+ --name master \\
+ --cert-file=/srv/kubernetes/etcd.crt \\
+ --key-file=/srv/kubernetes/etcd.key \\
+ --peer-cert-file=/srv/kubernetes/etcd.crt \\
+ --peer-key-file=/srv/kubernetes/etcd.key \\
+ --trusted-ca-file=/srv/kubernetes/ca.pem \\
+ --peer-trusted-ca-file=/srv/kubernetes/ca.pem \\
+ --peer-client-cert-auth \\
+ --client-cert-auth \\
+ --initial-advertise-peer-urls https://192.168.100.218:2380 \\
+ --listen-peer-urls https://192.168.100.218:2380 \\
+ --listen-client-urls https://192.168.100.218:2379,http://127.0.0.1:2379 \\
+ --advertise-client-urls https://192.168.100.218:2379 \\
+ --initial-cluster-token etcd-cluster-0 \\
+ --initial-cluster master=https://192.168.100.218:2380 \\
+ --initial-cluster-state new \\
+ --data-dir=/var/lib/etcd \\
  --debug
 Restart=always
 RestartSec=10s
-LimitNOFILE=40000</pre>
+LimitNOFILE=40000
+Type=notify
+EOF
+sudo systemctl enable etcd
+sudo systemctl start etcd
+sudo systemctl status etcd --no-pager</pre>
 </div>
 </div>
 </div>
@@ -1080,6 +1085,9 @@ sudo cp flanneld-s390x /usr/local/bin/flanneld</pre>
 </div>
 <div class="sect2">
 <h3 id="_running_flanneld_as_a_systemd_service">Running Flanneld as a systemd service</h3>
+<div class="paragraph">
+<p>Check the interface on which the nodes are connected using <code><code>ip a</code></code>. Here it is <strong>enc1</strong>. Replace it with the correct interface.</p>
+</div>
 <div class="literalblock">
 <div class="content">
 <pre>sudo cat &gt; /etc/systemd/system/flanneld.service &lt;&lt; EOF
@@ -1096,13 +1104,13 @@ Before=docker.service
 Type=notify
 Restart=always
 RestartSec=5
-ExecStart= /usr/local/bin/flanneld \
-	-etcd-endpoints=https://192.168.100.218:2379 \
-  -iface=enc1 \
-  -ip-masq=true \
-  -subnet-file=/var/lib/flanneld/subnet.env \
-  -etcd-cafile=/srv/kubernetes/ca.pem \
-  -etcd-certfile=/srv/kubernetes/etcd.crt \
+ExecStart= /usr/local/bin/flanneld \\
+  -etcd-endpoints=https://192.168.100.218:2379 \\
+  -iface=enc1 \\
+  -ip-masq=true \\
+  -subnet-file=/var/lib/flanneld/subnet.env \\
+  -etcd-cafile=/srv/kubernetes/ca.pem \\
+  -etcd-certfile=/srv/kubernetes/etcd.crt \\
   -etcd-keyfile=/srv/kubernetes/etcd.key
 
 [Install]
@@ -1200,35 +1208,35 @@ After=network.target etcd.service flanneld.service
 [Service]
 EnvironmentFile=-/var/lib/flanneld/subnet.env
 #User=kube
-ExecStart=/usr/local/bin/kube-apiserver \
- --bind-address=0.0.0.0 \
- --advertise-address=192.168.100.218 \
- --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota \
- --allow-privileged=true \
- --anonymous-auth=false \
- --apiserver-count=1 \
- --authorization-mode=RBAC,AlwaysAllow \
- --authorization-rbac-super-user=admin \
- --etcd-cafile=/srv/kubernetes/ca.pem \
- --etcd-certfile=/srv/kubernetes/etcd.crt \
- --etcd-keyfile=/srv/kubernetes/etcd.key \
- --etcd-servers=https://192.168.100.218:2379 \
- --enable-swagger-ui=true \
- --event-ttl=1h \
- --insecure-bind-address=0.0.0.0 \
- --kubelet-certificate-authority=/srv/kubernetes/ca.pem \
- --kubelet-client-certificate=/srv/kubernetes/kubelet.pem \
- --kubelet-client-key=/srv/kubernetes/kubelet-key.pem \
- --kubelet-https=true \
- --client-ca-file=/srv/kubernetes/ca.pem \
- --runtime-config=api/all=true,batch/v2alpha1=true,rbac.authorization.k8s.io/v1alpha1=true \
- --secure-port=6443 \
- --service-cluster-ip-range=100.65.0.0/24 \
- --storage-backend=etcd3 \
- --tls-cert-file=/srv/kubernetes/apiserver.pem \
- --tls-private-key-file=/srv/kubernetes/apiserver-key.pem \
- --tls-ca-file=/srv/kubernetes/ca.pem \
- --logtostderr=true \
+ExecStart=/usr/local/bin/kube-apiserver \\
+ --bind-address=0.0.0.0 \\
+ --advertise-address=192.168.100.218 \\
+ --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota \\
+ --allow-privileged=true \\
+ --anonymous-auth=false \\
+ --apiserver-count=1 \\
+ --authorization-mode=RBAC,AlwaysAllow \\
+ --authorization-rbac-super-user=admin \\
+ --etcd-cafile=/srv/kubernetes/ca.pem \\
+ --etcd-certfile=/srv/kubernetes/etcd.crt \\
+ --etcd-keyfile=/srv/kubernetes/etcd.key \\
+ --etcd-servers=https://192.168.100.218:2379 \\
+ --enable-swagger-ui=true \\
+ --event-ttl=1h \\
+ --insecure-bind-address=0.0.0.0 \\
+ --kubelet-certificate-authority=/srv/kubernetes/ca.pem \\
+ --kubelet-client-certificate=/srv/kubernetes/kubelet.pem \\
+ --kubelet-client-key=/srv/kubernetes/kubelet-key.pem \\
+ --kubelet-https=true \\
+ --client-ca-file=/srv/kubernetes/ca.pem \\
+ --runtime-config=api/all=true,batch/v2alpha1=true,rbac.authorization.k8s.io/v1alpha1=true \\
+ --secure-port=6443 \\
+ --service-cluster-ip-range=100.65.0.0/24 \\
+ --storage-backend=etcd3 \\
+ --tls-cert-file=/srv/kubernetes/apiserver.pem \\
+ --tls-private-key-file=/srv/kubernetes/apiserver-key.pem \\
+ --tls-ca-file=/srv/kubernetes/ca.pem \\
+ --logtostderr=true \\
  --v=6
 Restart=on-failure
 #Type=notify
@@ -1253,10 +1261,10 @@ Description=Kubernetes Scheduler
 Documentation=https://github.com/GoogleCloudPlatform/kubernetes
 
 [Service]
-ExecStart=/usr/local/bin/kube-scheduler \
-  --leader-elect=true \
-  --kubeconfig=/var/lib/kube-scheduler/kubeconfig \
-  --master=https://192.168.100.218:6443 \
+ExecStart=/usr/local/bin/kube-scheduler \\
+  --leader-elect=true \\
+  --kubeconfig=/var/lib/kube-scheduler/kubeconfig \\
+  --master=https://192.168.100.218:6443 \\
   --v=2
 Restart=on-failure
 RestartSec=5
@@ -1280,21 +1288,21 @@ Description=Kubernetes Controller Manager
 Documentation=https://github.com/GoogleCloudPlatform/kubernetes
 
 [Service]
-ExecStart=/usr/local/bin/kube-controller-manager \
-	--v=2 \
-  --allocate-node-cidrs=true \
-	--attach-detach-reconcile-sync-period=1m0s \
-	--cluster-cidr=100.64.0.0/16 \
-	--cluster-name=k8s.virtual.local \
-	--leader-elect=true \
-	--root-ca-file=/srv/kubernetes/ca.pem \
-	--service-account-private-key-file=/srv/kubernetes/apiserver-key.pem \
-	--use-service-account-credentials=true \
-	--kubeconfig=/var/lib/kube-controller-manager/kubeconfig \
-	--cluster-signing-cert-file=/srv/kubernetes/ca.pem \
-	--cluster-signing-key-file=/srv/kubernetes/ca-key.pem \
-	--service-cluster-ip-range=100.65.0.0/24 \
-	--configure-cloud-routes=false \
+ExecStart=/usr/local/bin/kube-controller-manager \\
+	--v=2 \\
+  --allocate-node-cidrs=true \\
+	--attach-detach-reconcile-sync-period=1m0s \\
+	--cluster-cidr=100.64.0.0/16 \\
+	--cluster-name=k8s.virtual.local \\
+	--leader-elect=true \\
+	--root-ca-file=/srv/kubernetes/ca.pem \\
+	--service-account-private-key-file=/srv/kubernetes/apiserver-key.pem \\
+	--use-service-account-credentials=true \\
+	--kubeconfig=/var/lib/kube-controller-manager/kubeconfig \\
+	--cluster-signing-cert-file=/srv/kubernetes/ca.pem \\
+	--cluster-signing-key-file=/srv/kubernetes/ca-key.pem \\
+	--service-cluster-ip-range=100.65.0.0/24 \\
+	--configure-cloud-routes=false \\
 	--master=https://192.168.100.218:6443
 Restart=on-failure
 RestartSec=5
@@ -1397,6 +1405,20 @@ Server Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.8", GitCommi
 </div>
 </div>
 <div class="sect2">
+<h3 id="_test_if_all_the_components_are_healthy">Test if all the components are healthy</h3>
+<div class="paragraph">
+<p>Running <code><code>kubectl get componentstatus</code></code> should return the status of all the components</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>NAME                 STATUS    MESSAGE             ERROR
+scheduler            Healthy   ok
+controller-manager   Healthy   ok
+etcd-0               Healthy   {"health":"true"}</pre>
+</div>
+</div>
+</div>
+<div class="sect2">
 <h3 id="_test_if_the_node_is_registered">Test if the node is registered</h3>
 <div class="paragraph">
 <p>Running <code><code>kubectl get nodes</code></code> should return the nodes sucessfully registered with the server and status of each node.</p>
@@ -1428,8 +1450,16 @@ curl http://192.168.100.225:${NODE_PORT} #The IP is of Worker node</pre>
 <div class="sect1">
 <h2 id="_troubleshooting">Troubleshooting</h2>
 <div class="sectionbody">
-<div class="paragraph">
-<p>&lt;WIP&gt;</p>
+<div class="ulist">
+<ul>
+<li>
+<p>If any of the Kubernetes component throws up an error, check the reason for the error by observing the logs
+of the service using <code><code>journalctl -fu &lt;service name&gt;</code></code></p>
+</li>
+<li>
+<p>To debug a kubectl command, use the flag <code><code>-v=&lt;log level&gt;</code></code></p>
+</li>
+</ul>
 </div>
 </div>
 </div>
@@ -1461,7 +1491,7 @@ curl http://192.168.100.225:${NODE_PORT} #The IP is of Worker node</pre>
 <div id="footer">
 <div id="footer-text">
 Version 1.2<br>
-Last updated 2018-06-17 01:00:14 IST
+Last updated 2018-06-19 01:49:12 IST
 </div>
 </div>
 </body>
