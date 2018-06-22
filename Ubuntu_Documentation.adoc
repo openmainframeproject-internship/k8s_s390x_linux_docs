@@ -1,7 +1,7 @@
 = Installing Kubernetes on LinuxOne - Canonical Distribution
 Rajula Vineet Reddy <rajula96reddy@gmail.com>
-v1.2, 2018-06-18
-:toc:
+v1.3, 2018-06-22
+:toc: left
 
 *Note:* This setup documents running a two node (1 Master & 1 Worker) Kubernetes Cluster
 on LinuxOne cloud using LinuxOne supported linux distribution *Canonical Ubuntu 18.04*.
@@ -65,7 +65,7 @@ working of *flannel*.
 sudo apt-get -y install vim git net-tools
 ....
 +
-8. Install docker on all the nodes.
+8. Install docker on Worker node(s).
 +
 ....
 cd ~/Downloads
@@ -73,7 +73,7 @@ wget https://download.docker.com/linux/ubuntu/dists/bionic/pool/nightly/s390x/do
 sudo apt-get install libltdl7 #docker dependency
 sudo dpkg -i docker-ce*
 sudo systemctl enable docker.service
-# sudo systemctl start docker.service
+sudo systemctl start docker.service
 ....
 +
 9. Create the below folders in order to save certificates & configuration files later
@@ -83,7 +83,6 @@ sudo systemctl enable docker.service
 sudo mkdir -p /srv/kubernetes
 sudo mkdir -p /var/lib/{kube-controller-manager,kube-scheduler}
 sudo mkdir /var/lib/flanneld/
-sudo mkdir -p
 ....
 +
  - On Worker Node(s)
@@ -266,29 +265,33 @@ cat ~/.kube/config #Create config file
 TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218:6443 --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
 kubectl config set-credentials kube-controller-manager --client-certificate=/srv/kubernetes/kube-controller-manager.pem --client-key=/srv/kubernetes/kube-controller-manager-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
-kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-controller-manager --kubeconfig=/var/lib/kube-controller-manager/kubeconfig; kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
+kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-controller-manager --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
+kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
 ....
 #### Kube-scheduler Kubeconfig
 ....
 TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218:6443 --kubeconfig=/var/lib/kube-scheduler/kubeconfig
 kubectl config set-credentials kube-scheduler --client-certificate=/srv/kubernetes/kube-scheduler.pem --client-key=/srv/kubernetes/kube-scheduler-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/var/lib/kube-scheduler/kubeconfig
-kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-scheduler --kubeconfig=/var/lib/kube-scheduler/kubeconfig; kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-scheduler/kubeconfig
+kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-scheduler --kubeconfig=/var/lib/kube-scheduler/kubeconfig
+kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-scheduler/kubeconfig
 ....
 #### Kubelet Kubeconfig (for Worker Node)
 ....
 TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218:6443 --kubeconfig=kubelet.kubeconfig
 kubectl config set-credentials kubelet --client-certificate=/srv/kubernetes/kubelet.pem --client-key=/srv/kubernetes/kubelet-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=kubelet.kubeconfig
-kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kubelet --kubeconfig=/var/lib/kubelet/kubeconfig; kubectl config use-context linux1.k8s --kubeconfig=kubelet.kubeconfig
-scp kube-proxy.kubeconfig root@192.168.100.225:/var/lib/kubelet/kubeconfig
+kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kubelet --kubeconfig=kubelet.kubeconfig
+kubectl config use-context linux1.k8s --kubeconfig=kubelet.kubeconfig
+scp kubelet.kubeconfig root@192.168.100.225:/var/lib/kubelet/kubeconfig
 ....
 #### Kube-proxy Kubeconfig (for Worker Node)
 ....
 TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218:6443 --kubeconfig=kube-proxy.kubeconfig
 kubectl config set-credentials kube-proxy --client-certificate=/srv/kubernetes/kube-proxy.pem --client-key=/srv/kubernetes/kube-proxy-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=kube-proxy.kubeconfig
-kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-proxy --kubeconfig=/var/lib/kube-proxy/kubeconfig; kubectl config use-context linux1.k8s --kubeconfig=kube-proxy.kubeconfig
+kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-proxy --kubeconfig=kube-proxy.kubeconfig
+kubectl config use-context linux1.k8s --kubeconfig=kube-proxy.kubeconfig
 scp kube-proxy.kubeconfig root@192.168.100.225:/var/lib/kube-proxy/kubeconfig
 ....
 ## Setting up Etcd

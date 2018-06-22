@@ -431,16 +431,16 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 @media amzn-kf8{#header,#content,#footnotes,#footer{padding:0}}
 </style>
 </head>
-<body class="article">
+<body class="article toc2 toc-left">
 <div id="header">
 <h1>Installing Kubernetes on LinuxOne - Canonical Distribution</h1>
 <div class="details">
 <span id="author" class="author">Rajula Vineet Reddy</span><br>
 <span id="email" class="email"><a href="mailto:rajula96reddy@gmail.com">rajula96reddy@gmail.com</a></span><br>
-<span id="revnumber">version 1.2,</span>
-<span id="revdate">2018-06-18</span>
+<span id="revnumber">version 1.3,</span>
+<span id="revdate">2018-06-22</span>
 </div>
-<div id="toc" class="toc">
+<div id="toc" class="toc2">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel1">
 <li><a href="#_versions_of_all_the_components_used">Versions of all the components used</a></li>
@@ -639,7 +639,7 @@ working of <strong>flannel</strong>.</p>
 </div>
 </li>
 <li>
-<p>Install docker on all the nodes.</p>
+<p>Install docker on Worker node(s).</p>
 <div class="literalblock">
 <div class="content">
 <pre>cd ~/Downloads
@@ -647,7 +647,7 @@ wget https://download.docker.com/linux/ubuntu/dists/bionic/pool/nightly/s390x/do
 sudo apt-get install libltdl7 #docker dependency
 sudo dpkg -i docker-ce*
 sudo systemctl enable docker.service
-# sudo systemctl start docker.service</pre>
+sudo systemctl start docker.service</pre>
 </div>
 </div>
 </li>
@@ -661,8 +661,7 @@ sudo systemctl enable docker.service
 <div class="content">
 <pre>sudo mkdir -p /srv/kubernetes
 sudo mkdir -p /var/lib/{kube-controller-manager,kube-scheduler}
-sudo mkdir /var/lib/flanneld/
-sudo mkdir -p</pre>
+sudo mkdir /var/lib/flanneld/</pre>
 </div>
 </div>
 </li>
@@ -940,7 +939,8 @@ cat ~/.kube/config #Create config file</pre>
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
 kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218:6443 --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
 kubectl config set-credentials kube-controller-manager --client-certificate=/srv/kubernetes/kube-controller-manager.pem --client-key=/srv/kubernetes/kube-controller-manager-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
-kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-controller-manager --kubeconfig=/var/lib/kube-controller-manager/kubeconfig; kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-controller-manager/kubeconfig</pre>
+kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-controller-manager --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
+kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-controller-manager/kubeconfig</pre>
 </div>
 </div>
 </div>
@@ -951,7 +951,8 @@ kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-controlle
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
 kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218:6443 --kubeconfig=/var/lib/kube-scheduler/kubeconfig
 kubectl config set-credentials kube-scheduler --client-certificate=/srv/kubernetes/kube-scheduler.pem --client-key=/srv/kubernetes/kube-scheduler-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/var/lib/kube-scheduler/kubeconfig
-kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-scheduler --kubeconfig=/var/lib/kube-scheduler/kubeconfig; kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-scheduler/kubeconfig</pre>
+kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-scheduler --kubeconfig=/var/lib/kube-scheduler/kubeconfig
+kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-scheduler/kubeconfig</pre>
 </div>
 </div>
 </div>
@@ -962,8 +963,9 @@ kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-scheduler
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
 kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218:6443 --kubeconfig=kubelet.kubeconfig
 kubectl config set-credentials kubelet --client-certificate=/srv/kubernetes/kubelet.pem --client-key=/srv/kubernetes/kubelet-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=kubelet.kubeconfig
-kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kubelet --kubeconfig=/var/lib/kubelet/kubeconfig; kubectl config use-context linux1.k8s --kubeconfig=kubelet.kubeconfig
-scp kube-proxy.kubeconfig root@192.168.100.225:/var/lib/kubelet/kubeconfig</pre>
+kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kubelet --kubeconfig=kubelet.kubeconfig
+kubectl config use-context linux1.k8s --kubeconfig=kubelet.kubeconfig
+scp kubelet.kubeconfig root@192.168.100.225:/var/lib/kubelet/kubeconfig</pre>
 </div>
 </div>
 </div>
@@ -974,7 +976,8 @@ scp kube-proxy.kubeconfig root@192.168.100.225:/var/lib/kubelet/kubeconfig</pre>
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
 kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.218:6443 --kubeconfig=kube-proxy.kubeconfig
 kubectl config set-credentials kube-proxy --client-certificate=/srv/kubernetes/kube-proxy.pem --client-key=/srv/kubernetes/kube-proxy-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=kube-proxy.kubeconfig
-kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-proxy --kubeconfig=/var/lib/kube-proxy/kubeconfig; kubectl config use-context linux1.k8s --kubeconfig=kube-proxy.kubeconfig
+kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-proxy --kubeconfig=kube-proxy.kubeconfig
+kubectl config use-context linux1.k8s --kubeconfig=kube-proxy.kubeconfig
 scp kube-proxy.kubeconfig root@192.168.100.225:/var/lib/kube-proxy/kubeconfig</pre>
 </div>
 </div>
@@ -1490,8 +1493,8 @@ of the service using <code><code>journalctl -fu &lt;service name&gt;</code></cod
 </div>
 <div id="footer">
 <div id="footer-text">
-Version 1.2<br>
-Last updated 2018-06-19 01:49:12 IST
+Version 1.3<br>
+Last updated 2018-06-22 19:16:23 IST
 </div>
 </div>
 </body>
