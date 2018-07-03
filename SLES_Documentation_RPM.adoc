@@ -294,7 +294,7 @@ User=etcd
 ExecStart=/bin/bash -c "GOMAXPROCS=$(nproc) /usr/sbin/etcd --name=\"${ETCD_NAME}\"  \
 --data-dir=\"${ETCD_DATA_DIR}\" \
 --listen-client-urls=\"${ETCD_LISTEN_CLIENT_URLS}\" \
---cert-file=\"${ETCD_CERT_FILE}\" \
+[red]#--cert-file=\"${ETCD_CERT_FILE}\" \
 --key-file=\"${ETCD_KEY_FILE}\" \
 --peer-cert-file=\"${ETCD_PEER_CERT_FILE}\" \
 --peer-key-file=\"${ETCD_PEER_KEY_FILE}\" \
@@ -306,7 +306,7 @@ ExecStart=/bin/bash -c "GOMAXPROCS=$(nproc) /usr/sbin/etcd --name=\"${ETCD_NAME}
 --advertise-client-urls=\"${ETCD_ADVERTISE_CLIENT_URLS}\"  \
 --initial-cluster-token=\"${ETCD_INITIAL_CLUSTER_TOKEN}\" \
 --initial-cluster=\"${ETCD_INITIAL_CLUSTER}\" \
---initial-cluster-state=\"${ETCD_INITIAL_CLUSTER_STATE}\""
+--initial-cluster-state=\"${ETCD_INITIAL_CLUSTER_STATE}\"#"
 Restart=on-failure
 LimitNOFILE=65536
 Nice=-10
@@ -393,30 +393,7 @@ This should be run only once and only on the Master node
 ....
 etcdctl --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'
 ....
-### Modifying the Flanneld the systemd service & setting its configuration
-Modify the ``/usr/lib/systemd/system/flanneld.service`` as shown below (Red indicates the
-modifications to the file)
-....
-[Unit]
-Description=Flanneld overlay address etcd agent
-After=network.target
-After=network-online.target
-Wants=network-online.target
-After=etcd.service
-Before=docker.service
-
-[Service]
-Type=notify
-EnvironmentFile=/etc/sysconfig/flanneld
-EnvironmentFile=-/etc/sysconfig/docker-network
-ExecStart=/usr/sbin/flanneld -etcd-endpoints=${FLANNEL_ETCD_ENDPOINTS} -etcd-prefix=${FLANNEL_ETCD_KEY} $FLANNEL_OPTIONS
-ExecStartPost=/usr/lib/flannel/mk-docker-opts.sh -k DOCKER_NETWORK_OPTIONS -d /run/flannel/docker
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-RequiredBy=docker.service
-....
+### Configure Flannel Settings
 Initialize the variables required for flanneld in the configuration
 file ``/etc/sysconfig/flanneld`` as shown below
 ....
@@ -433,7 +410,7 @@ FLANNEL_OPTIONS="-subnet-file=/var/lib/flanneld/subnet.env \
 -etcd-keyfile=/srv/kubernetes/etcd.key"
 ....
 
-#### Changing Docker Settings
+#### Configure Docker Settings
 Modify the docker configuration file ``/etc/sysconfig/docker`` to
 add extra arguments for docker executable as follows
 ....
