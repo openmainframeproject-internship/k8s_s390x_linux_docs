@@ -1,0 +1,714 @@
+= Installing Kubernetes on LinuxOne - SUSE Linux Enterprise Server Distribution
+Rajula Vineet Reddy <rajula96reddy@gmail.com>
+v1.0, 2018-07-02
+:toc: left
+
+*Note:* This setup documents running a two node (1 Master & 1 Worker) Kubernetes Cluster
+on LinuxOne cloud using LinuxOne supported linux distribution *SUSE Linux Enterprise Server 12 SP3*.
+
+## Versions of all the components used
+The cluster is based on *docker* as container run-time and the components are installed as *systemd* services
+with *flannel* as the overlay networking model. The versions of each components used are as follows
+[options="header,footer",width="70%"]
+|====
+| Component/ Infrastructure | Version
+| LinuxOne Instance flavour | LinuxONE-Medium
+| LinuxOne Instance OS | SLES12SP3
+| SLES VMs | SLES12SP3
+| Go | 1.10.2
+| Kubernetes | 1.9.6
+| Docker | 17.09.1-ce
+| Etcd | 3.3.6
+| Flannel | 0.9.1
+|====
+
+## KVM Setup
+Refer to this https://gist.github.com/rajula96reddy/a9065c75d0b7c1b9f5472e0d480f31eb[gist] to setup
+virtual machines using KVM on LinuxOne Community Cloud.
+
+## Setting up the VMs before installing the components
+1. Create two virtual machines after setting up KVM as explained above and install SLES12 SP3 on both the nodes
+2. [[notice]]
+While installing make sure to register the VM's with the SLES server and install the following _System Extensions or Add-Ons_.
+  - Containers Module 12 s390x (On both Master & Worker)
+  - SUSE Linux Enterprise High Availability Extension 12 SP3 s390x (On Worker)
++
+You might need to register on https://www.suse.com/[SLES website] to get the registration code for installing. There is a free 60 day
+Evaluation version available
+https://www.suse.com/products/server/download/15BQH2uh8KU~/?event_id=GSDGNweb29583&event_name=Eval:+SP3-+z+systems+and+LinuxONE&icid=GSDGNweb29663&icname=Eval:+SP3-+z+systems+and+LinuxONE+Nurture[here].
+For installing High Availability extension, you need to register on the SLES website apart from the previous registration.
+There is a 60 day evaluation version available
+https://www.suse.com/products/highavailability/download/rwCbMRbm3iU~/?event_id=GSDGNweb29667&event_name=Eval:+SLE12+SP3+HAE+z+Systems&icid=GSDGNweb29702&icname=Eval:+SLE12+SP3+HAE+z+Systems+Nurture[here]
++
+3. Make sure to set the hostname of both the machines to differentiate one machine from the other. Preferably
+name the machines as *_k8s-master_* for the Master node and *_k8s-worker_* for the Worker node
+// 3. Resource allocation of the nodes < Working >
+4. SSH into the nodes and follow the below steps in the nodes specified across each step
+5. Note down the IP addresses of both the nodes. In the context of this document, IP addresses of the nodes
+are as follows
++
+[options="header,footer",width="50%"]
+|====
+| Node | IP
+| Master | [red]#192.168.100.230#
+| Worker | [red]#192.168.100.169#
+|====
++
+6. Make sure the firewall is disabled while installing the virtual machine, if not disable it
+by running ```SuSEfirewall2 off```
+7. Install docker on Worker node(s). To install docker on SLES, it is necessary to register the
+machine with the SLES server and download  add-on module _Containers Module 12 s390x_ as specified in step <<notice,step>>.
+Use the following commands to install docker.
++
+....
+sudo zypper install -y docker
+sudo systemctl enable docker.service
+sudo systemctl start docker.service
+....
++
+8. Create the below folders in order to save certificates & configuration files later
+- On Master Node
++
+....
+sudo mkdir -p /srv/kubernetes
+sudo mkdir -p /var/lib/{kube-controller-manager,kube-scheduler}
+sudo mkdir /var/lib/flanneld/
+....
++
+- On Worker Node(s)
++
+....
+sudo mkdir -p /srv/kubernetes
+sudo mkdir -p /var/lib/{kube-proxy,kubelet}
+sudo mkdir /var/lib/flanneld/
+....
+9. It is recommended to run Kubernetes without using swap memory.
+Disable swap space on all the nodes, by running
+....
+swapoff -a
+sudo sed -i 's/.*swap/#&/' /etc/fstab
+....
+## Creating Certificates & Authentication to enable secure communication across all the Kubernetes components
+Run all the following steps and thereby generate the files in the Master node, and then copy the
+specific mentioned certs and config files to the worker nodes.
+
+### Generating Certificates
+#### CA - Certificate Authority
+....
+cd /srv/kubernetes
+openssl genrsa -out ca-key.pem 2048
+openssl req -x509 -new -nodes -key ca-key.pem -days 10000 -out ca.pem -subj "/CN=kube-ca"
+....
+#### Master Node OpenSSL config
+....
+cat > openssl.cnf <<EOF
+[req]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+
+[req_distinguished_name]
+
+[v3_req]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = kubernetes
+DNS.2 = kubernetes.default
+DNS.3 = kubernetes.default.svc
+DNS.4 = kubernetes.default.svc.cluster.local
+IP.1 = 127.0.0.1
+IP.2 = 192.168.100.230 # Master IP
+EOF
+....
+#### Kube-apiserver certificates
+....
+openssl genrsa -out apiserver-key.pem 2048
+openssl req -new -key apiserver-key.pem -out apiserver.csr -subj "/CN=kube-apiserver" -config openssl.cnf
+openssl x509 -req -in apiserver.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial \
+-out apiserver.pem -days 7200 -extensions v3_req -extfile openssl.cnf
+cp apiserver.pem server.crt
+cp apiserver-key.pem server.key
+....
+#### Admin certificates
+....
+openssl genrsa -out admin-key.pem 2048
+openssl req -new -key admin-key.pem -out admin.csr -subj "/CN=admin"
+openssl x509 -req -in admin.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out admin.pem -days 7200
+....
+#### Kube-proxy certificates
+....
+openssl genrsa -out kube-proxy-key.pem 2048
+openssl req -new -key kube-proxy-key.pem -out kube-proxy.csr -subj "/CN=kube-proxy"
+openssl x509 -req -in kube-proxy.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kube-proxy.pem -days 7200
+....
+#### Kubelet certificates
+....
+openssl genrsa -out kubelet-key.pem 2048
+openssl req -new -key kubelet-key.pem -out kubelet.csr -subj "/CN=kubelet"
+openssl x509 -req -in kubelet.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kubelet.pem -days 7200
+....
+#### Kube-controller-manager certificates
+....
+openssl genrsa -out kube-controller-manager-key.pem 2048
+openssl req -new -key kube-controller-manager-key.pem -out kube-controller-manager.csr -subj "/CN=kube-controller-manager"
+openssl x509 -req -in kube-controller-manager.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kube-controller-manager.pem -days 7200
+....
+#### Kube-scheduler certificates
+....
+openssl genrsa -out kube-scheduler-key.pem 2048
+openssl req -new -key kube-scheduler-key.pem -out kube-scheduler.csr -subj "/CN=kube-scheduler"
+openssl x509 -req -in kube-scheduler.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kube-scheduler.pem -days 7200
+....
+#### Worker OpenSSL config
+....
+cat > worker-openssl.cnf << EOF
+[req]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+[req_distinguished_name]
+[v3_req]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+subjectAltName = @alt_names
+[alt_names]
+IP.1 = 192.168.100.169
+EOF
+....
+#### Worker certificates
+....
+openssl genrsa -out ubuntu-worker-key.pem 2048
+WORKER_IP=192.168.100.169 openssl req -new -key ubuntu-worker-key.pem -out ubuntu-worker.csr \
+-subj "/CN=ubuntu" -config worker-openssl.cnf
+WORKER_IP=192.168.100.169 openssl x509 -req -in ubuntu-worker.csr -CA ca.pem -CAkey ca-key.pem \
+-CAcreateserial -out ubuntu-worker.pem -days 7200 -extensions v3_req -extfile worker-openssl.cnf
+....
+#### Etcd OpenSSL config
+....
+cat > etcd-openssl.cnf <<EOF
+[req]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+[req_distinguished_name]
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth,serverAuth
+subjectAltName = @alt_names
+[alt_names]
+IP.1 = 192.168.100.230
+EOF
+....
+#### Etcd certificates
+....
+openssl genrsa -out etcd.key 2048
+openssl req -new -key etcd.key -out etcd.csr -subj "/CN=etcd" -extensions v3_req -config etcd-openssl.cnf -sha256
+openssl x509 -req -sha256 -CA ca.pem -CAkey ca-key.pem -CAcreateserial \
+-in etcd.csr -out etcd.crt -extensions v3_req -extfile etcd-openssl.cnf -days 7200
+....
+#### Copy the required certificates to the Worker node
+....
+scp ca.pem etcd.crt etcd.key server.crt server.key root@192.168.100.169:/srv/kubernetes/
+....
+### Generating Kubeconfig files
+#### Admin Kubeconfig
+....
+TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.230:6443
+kubectl config set-credentials admin --client-certificate=/srv/kubernetes/admin.pem --client-key=/srv/kubernetes/admin-key.pem --embed-certs=true --token=$TOKEN
+kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=admin
+kubectl config use-context linux1.k8s
+cat ~/.kube/config #Create config file
+....
+#### Kube-controller-manager Kubeconfig
+....
+TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.230:6443 --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
+kubectl config set-credentials kube-controller-manager --client-certificate=/srv/kubernetes/kube-controller-manager.pem --client-key=/srv/kubernetes/kube-controller-manager-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
+kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-controller-manager --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
+kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
+....
+#### Kube-scheduler Kubeconfig
+....
+TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.230:6443 --kubeconfig=/var/lib/kube-scheduler/kubeconfig
+kubectl config set-credentials kube-scheduler --client-certificate=/srv/kubernetes/kube-scheduler.pem --client-key=/srv/kubernetes/kube-scheduler-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/var/lib/kube-scheduler/kubeconfig
+kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-scheduler --kubeconfig=/var/lib/kube-scheduler/kubeconfig
+kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-scheduler/kubeconfig
+....
+#### Kubelet Kubeconfig (for Worker Node)
+....
+TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.230:6443 --kubeconfig=kubelet.kubeconfig
+kubectl config set-credentials kubelet --client-certificate=/srv/kubernetes/kubelet.pem --client-key=/srv/kubernetes/kubelet-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=kubelet.kubeconfig
+kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kubelet --kubeconfig=kubelet.kubeconfig
+kubectl config use-context linux1.k8s --kubeconfig=kubelet.kubeconfig
+scp kubelet.kubeconfig root@192.168.100.169:/var/lib/kubelet/kubeconfig
+....
+#### Kube-proxy Kubeconfig (for Worker Node)
+....
+TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.230:6443 --kubeconfig=kube-proxy.kubeconfig
+kubectl config set-credentials kube-proxy --client-certificate=/srv/kubernetes/kube-proxy.pem --client-key=/srv/kubernetes/kube-proxy-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=kube-proxy.kubeconfig
+kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-proxy --kubeconfig=kube-proxy.kubeconfig
+kubectl config use-context linux1.k8s --kubeconfig=kube-proxy.kubeconfig
+scp kube-proxy.kubeconfig root@192.168.100.169:/var/lib/kube-proxy/kubeconfig
+....
+## Downloading all the components RPM files
+In this setup, we will install all the components using RPM files build for SLES using SUSE Open Build Service
+from https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/[here]
+
+### Few important RPM commands that might be useful in this setup
+- ``rpm -qpi file.rpm`` -> Gives detailed information about the package
+- ``rpm -qpl file.rpm`` -> Shows all the files installed by the package
+- ``rpm -qp --requires file.rpm`` -> Lists all dependencies required by the package
+- ``rpm -U file.rpm`` -> Installs the package
+
+## Setting Up Etcd
+### Downloading & Installing Etcd RPM packages
+....
+cd ~/
+wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/etcd-3.3.1-3.1.s390x.rpm
+wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/etcdctl-3.3.1-3.1.s390x.rpm
+rpm -U etcd-3.3.1-3.1.s390x.rpm
+rpm -U etcdctl-3.3.1-3.1.s390x.rpm
+....
+### Modifying the Etcd systemd service & its configuration
+Modify the file ``/usr/lib/systemd/system`` as shown below (Red indicates the modifications to the file)
+[subs=+quotes]
+....
+[Unit]
+Description=Etcd Server
+After=network.target
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+WorkingDirectory=/var/lib/etcd/
+[red]#Environment="ETCD_UNSUPPORTED_ARCH=s390x"#
+EnvironmentFile=-/etc/sysconfig/etcd
+User=etcd
+# set GOMAXPROCS to number of processors
+ExecStart=/bin/bash -c "GOMAXPROCS=$(nproc) /usr/sbin/etcd --name=\"${ETCD_NAME}\"  \
+--data-dir=\"${ETCD_DATA_DIR}\" \
+--listen-client-urls=\"${ETCD_LISTEN_CLIENT_URLS}\" \
+--cert-file=\"${ETCD_CERT_FILE}\" \
+--key-file=\"${ETCD_KEY_FILE}\" \
+--peer-cert-file=\"${ETCD_PEER_CERT_FILE}\" \
+--peer-key-file=\"${ETCD_PEER_KEY_FILE}\" \
+--trusted-ca-file=\"${ETCD_TRUSTED_CA_FILE}\"  \
+--peer-trusted-ca-file=\"${ETCD_TRUSTED_CA_FILE}\"  \
+--peer-client-cert-auth \
+--client-cert-auth \
+--initial-advertise-peer-urls=\"${ETCD_INITIAL_ADVERTISE_PEER_URLS}\"  \
+--advertise-client-urls=\"${ETCD_ADVERTISE_CLIENT_URLS}\"  \
+--initial-cluster-token=\"${ETCD_INITIAL_CLUSTER_TOKEN}\" \
+--initial-cluster=\"${ETCD_INITIAL_CLUSTER}\" \
+--initial-cluster-state=\"${ETCD_INITIAL_CLUSTER_STATE}\""
+Restart=on-failure
+LimitNOFILE=65536
+Nice=-10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=2
+
+[Install]
+WantedBy=multi-user.target
+....
+Also initialize the variables in the configuration file ``/etc/sysconfig/etcd``
+as shown below
+....
+# [member]
+ETCD_NAME=master
+ETCD_DATA_DIR="/var/lib/etcd"
+#ETCD_WAL_DIR=""
+#ETCD_SNAPSHOT_COUNT="10000"
+#ETCD_HEARTBEAT_INTERVAL="100"
+#ETCD_ELECTION_TIMEOUT="1000"
+ETCD_LISTEN_PEER_URLS="https://192.168.100.230:2380"
+ETCD_LISTEN_CLIENT_URLS="https://192.168.100.230:2379,http://127.0.0.1:2379"
+#ETCD_MAX_SNAPSHOTS="5"
+#ETCD_MAX_WALS="5"
+#ETCD_CORS=""
+#
+#[cluster]
+ETCD_INITIAL_ADVERTISE_PEER_URLS="https://192.168.100.230:2380"
+# if you use different ETCD_NAME (e.g. test), set ETCD_INITIAL_CLUSTER value for this name, i.e. "test=http://..."
+ETCD_INITIAL_CLUSTER="master=https://192.168.100.230:2380"
+ETCD_INITIAL_CLUSTER_STATE="new"
+ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster-0"
+ETCD_ADVERTISE_CLIENT_URLS="https://192.168.100.230:2379"
+#ETCD_DISCOVERY=""
+#ETCD_DISCOVERY_SRV=""
+#ETCD_DISCOVERY_FALLBACK="proxy"
+#ETCD_DISCOVERY_PROXY=""
+#
+#[proxy]
+#ETCD_PROXY="off"
+#ETCD_PROXY_FAILURE_WAIT="5000"
+#ETCD_PROXY_REFRESH_INTERVAL="30000"
+#ETCD_PROXY_DIAL_TIMEOUT="1000"
+#ETCD_PROXY_WRITE_TIMEOUT="5000"
+#ETCD_PROXY_READ_TIMEOUT="0"
+#
+#[security]
+ETCD_CERT_FILE="/srv/kubernetes/etcd.crt"
+ETCD_KEY_FILE="/srv/kubernetes/etcd.key"
+ETCD_CLIENT_CERT_AUTH="true"
+ETCD_TRUSTED_CA_FILE="/srv/kubernetes/ca.pem"
+ETCD_PEER_CERT_FILE="/srv/kubernetes/etcd.crt"
+ETCD_PEER_KEY_FILE="/srv/kubernetes/etcd.key"
+ETCD_PEER_CLIENT_CERT_AUTH="true"
+#ETCD_PEER_TRUSTED_CA_FILE=""
+#
+#[logging]
+ETCD_DEBUG="true"
+# examples for -log-package-levels etcdserver=WARNING,security=DEBUG
+ETCD_LOG_PACKAGE_LEVELS="DEBUG"
+....
+Now, run the following commands to start *etcd*
+....
+sudo systemctl daemon-reload
+sudo systemctl enable etcd
+sudo systemctl start etcd
+....
+### Test etcd cluster
+```
+etcdctl --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem cluster-health
+```
+This should return *cluster is healthy* if etcd is running correctly.
+
+## Setting up Flannel
+Flannel should be installed on all the nodes
+
+### Dowloading & Installing the Flannel RPM package
+....
+cd ~/Downloads
+wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/flannel-0.9.1-5.2.s390x.rpm
+rpm -U flannel-0.9.1-5.2.s390x.rpm
+....
+#### Adding an entry to etcd
+This should be run only once and only on the Master node
+....
+etcdctl --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'
+....
+### Modifying the Flanneld the systemd service & setting its configuration
+Modify the ``/usr/lib/systemd/system/flanneld.service`` as shown below (Red indicates the
+modifications to the file)
+....
+[Unit]
+Description=Flanneld overlay address etcd agent
+After=network.target
+After=network-online.target
+Wants=network-online.target
+After=etcd.service
+Before=docker.service
+
+[Service]
+Type=notify
+EnvironmentFile=/etc/sysconfig/flanneld
+EnvironmentFile=-/etc/sysconfig/docker-network
+ExecStart=/usr/sbin/flanneld -etcd-endpoints=${FLANNEL_ETCD_ENDPOINTS} -etcd-prefix=${FLANNEL_ETCD_KEY} $FLANNEL_OPTIONS
+ExecStartPost=/usr/lib/flannel/mk-docker-opts.sh -k DOCKER_NETWORK_OPTIONS -d /run/flannel/docker
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+RequiredBy=docker.service
+....
+Initialize the variables required for flanneld in the configuration
+file ``/etc/sysconfig/flanneld`` as shown below
+....
+# Flanneld configuration options
+
+# etcd url location.  Point this to the server where etcd runs
+FLANNEL_ETCD_ENDPOINTS="https://192.168.100.230:2379"
+# ETCD Prefix for the -etcd-prefix argument
+FLANNEL_ETCD_KEY="/coreos.com/network"
+# Any additional options that you want to pass
+FLANNEL_OPTIONS="-subnet-file=/var/lib/flanneld/subnet.env \
+-etcd-cafile=/srv/kubernetes/ca.pem \
+-etcd-certfile=/srv/kubernetes/etcd.crt \
+-etcd-keyfile=/srv/kubernetes/etcd.key"
+....
+
+#### Changing Docker Settings
+Modify the docker configuration file ``/etc/sysconfig/docker`` to
+add extra arguments for docker executable as follows
+....
+## Path           : System/Management
+## Description    : Extra cli switches for docker daemon
+## Type           : string
+## Default        : ""
+## ServiceRestart : docker
+#
+DOCKER_OPTS="--bip=100.64.98.1/24 --mtu=1450 --iptables=false --ip-masq=false --ip-forward=true"
+....
+
+Then run the following commands
+....
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+sudo systemctl enable flanneld
+sudo systemctl start flanneld
+....
+### Testing flanneld
+Once *flanneld* is started and *docker* daemon is restarted, running ```route -n``` on Master node
+and Worker node(s) the bridge established can be seen with the interface name as 'flannelx'. Also
+the IP of the nodes on the flannel networks can be seen by running ```ip a``` on all the nodes.
+
+## Setting up Kubernetes binaries on the Nodes
+### Downloading & Installing the RPM Packages
+#### Master Node
+....
+wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/kubernetes-common-1.9.6-6.1.s390x.rpm
+wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/kubernetes-master-1.9.6-6.1.s390x.rpm
+wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/kubernetes-client-1.9.6-6.1.s390x.rpm
+rpm -U kubernetes-common-1.9.6-6.1.s390x.rpm
+rpm -U kubernetes-master-1.9.6-6.1.s390x.rpm
+rpm -U kubernetes-client-1.9.6-6.1.s390x.rpm
+....
+#### Worker Node
+....
+wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/kubernetes-common-1.9.6-6.1.s390x.rpm
+wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/kubernetes-kubelet-1.9.6-6.1.s390x.rpm
+wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/kubernetes-node-1.9.6-6.1.s390x.rpm
+rpm -U kubernetes-common-1.9.6-6.1.s390x.rpm
+rpm -U kubernetes-kubelet-1.9.6-6.1.s390x.rpm
+rpm -U kubernetes-node-1.9.6-6.1.s390x.rpm
+....
+## Modifying the configuration files of the components
+### Master Components
+Modify the following configuration files in the directory ``/etc/kubernetes/`` as shown below
+
+#### General system config -> ``/etc/kubernetes/config``
+....
+###
+# kubernetes system config
+#
+# The following values are used to configure various aspects of all
+# kubernetes services, including
+#
+#   kube-apiserver.service
+#   kube-controller-manager.service
+#   kubelet.service
+#   kube-proxy.service
+# logging to stderr means we get it in the systemd journal
+KUBE_LOGTOSTDERR="--logtostderr=true"
+
+# journal message level, 0 is debug
+KUBE_LOG_LEVEL="--v=5"
+
+# Should this cluster be allowed to run privileged docker containers
+KUBE_ALLOW_PRIV="--allow-privileged=true"
+
+# How the controller-manager, and proxy find the apiserver
+KUBE_MASTER="--master=https://192.168.100.230:6443"
+....
+#### Api-server config ->  ``/etc/kubernetes/apiserver``
+....
+###
+# kubernetes system config
+#
+# The following values are used to configure the kube-apiserver
+#
+
+# The address on the local server to listen to.
+KUBE_API_ADDRESS="--insecure-bind-address=0.0.0.0"
+
+# The port on the local server to listen on.
+# KUBE_API_PORT="--port=8080"
+
+# Port minions listen on
+# KUBELET_PORT="--kubelet-port=10250"
+
+# Comma separated list of nodes in the etcd cluster
+KUBE_ETCD_SERVERS="--etcd-servers=https://192.168.100.230:2379"
+
+# Address range to use for services
+KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=100.65.0.0/24"
+
+# default admission control policies
+KUBE_ADMISSION_CONTROL="--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,ResourceQuota"
+
+# Add your own!
+KUBE_API_ARGS="--bind-address=0.0.0.0 \
+--advertise-address=192.168.100.230 \
+--anonymous-auth=false \
+--apiserver-count=1 \
+--authorization-mode=RBAC,AlwaysAllow \
+--etcd-cafile=/srv/kubernetes/ca.pem \
+--etcd-certfile=/srv/kubernetes/etcd.crt \
+--etcd-keyfile=/srv/kubernetes/etcd.key \
+--enable-swagger-ui=false \
+--event-ttl=1h \
+--kubelet-certificate-authority=/srv/kubernetes/ca.pem \
+--kubelet-client-certificate=/srv/kubernetes/kubelet.pem \
+--kubelet-client-key=/srv/kubernetes/kubelet-key.pem \
+--kubelet-https=true \
+--client-ca-file=/srv/kubernetes/ca.pem \
+--runtime-config=api/all=true,batch/v2alpha1=true,rbac.authorization.k8s.io/v1alpha1=true \
+--secure-port=6443 \
+--storage-backend=etcd3 \
+--tls-cert-file=/srv/kubernetes/apiserver.pem \
+--tls-private-key-file=/srv/kubernetes/apiserver-key.pem \
+--tls-ca-file=/srv/kubernetes/ca.pem"
+....
+#### Scheduler config ->  ``/etc/kubernetes/scheduler``
+....
+###
+# kubernetes scheduler config
+
+# default config should be adequate
+
+# Add your own!
+KUBE_SCHEDULER_ARGS="--leader-elect=true \
+--kubeconfig=/var/lib/kube-scheduler/kubeconfig"
+....
+#### Controller_manager config ->  ``/etc/kubernetes/controller-manager``
+....
+###
+# The following values are used to configure the kubernetes controller-manager
+
+# defaults from config and apiserver should be adequate
+
+# Add your own!
+KUBE_CONTROLLER_MANAGER_ARGS="--allocate-node-cidrs=true \
+--attach-detach-reconcile-sync-period=1m0s \
+--cluster-cidr=100.64.0.0/16 \
+--cluster-name=k8s.virtual.local \
+--leader-elect=true \
+--root-ca-file=/srv/kubernetes/ca.pem \
+--service-account-private-key-file=/srv/kubernetes/apiserver-key.pem \
+--use-service-account-credentials=true \
+--kubeconfig=/var/lib/kube-controller-manager/kubeconfig \
+--cluster-signing-cert-file=/srv/kubernetes/ca.pem \
+--cluster-signing-key-file=/srv/kubernetes/ca-key.pem \
+--service-cluster-ip-range=100.65.0.0/24 \
+--configure-cloud-routes=false "
+....
+#### Start the master components
+....
+sudo systemctl enable kube-apiserver
+sudo systemctl start kube-apiserver
+sudo systemctl enable kube-controller-manager
+sudo systemctl start kube-controller-manager
+sudo systemctl enable kube-scheduler
+sudo systemctl start kube-scheduler
+....
+### Worker Components
+#### General system config ->  ``/etc/kubernetes/config``
+....
+###
+# kubernetes system config
+#
+# The following values are used to configure various aspects of all
+# kubernetes services, including
+#
+#   kube-apiserver.service
+#   kube-controller-manager.service
+#   kubelet.service
+#   kube-proxy.service
+# logging to stderr means we get it in the systemd journal
+KUBE_LOGTOSTDERR="--logtostderr=true"
+
+# journal message level, 0 is debug
+KUBE_LOG_LEVEL="--v=2"
+
+# Should this cluster be allowed to run privileged docker containers
+KUBE_ALLOW_PRIV="--allow-privileged=true"
+
+# How the controller-manager, and proxy find the apiserver
+KUBE_MASTER="--master=https://192.168.100.230:6443"
+....
+#### Kubelet config ->  ``/etc/kubernetes/kubelet``
+....
+###
+# kubernetes kubelet (minion) config
+
+# The address for the info server to serve on (set to 0.0.0.0 or "" for all interfaces)
+KUBELET_ADDRESS="192.168.100.169"
+
+# The port for the info server to serve on
+# KUBELET_PORT=""
+
+# You may leave this blank to use the actual hostname
+KUBELET_HOSTNAME=""
+
+# Add your own!
+KUBELET_ARGS="--pod-manifest-path=/etc/kubernetes/manifests \
+--kubeconfig=/var/lib/kubelet/kubeconfig \
+--tls-cert-file=/srv/kubernetes/server.crt \
+--tls-private-key-file=/srv/kubernetes/server.key \
+--cert-dir=/var/lib/1_kubelet \
+--container-runtime=docker \
+--serialize-image-pulls=false \
+--register-node=true \
+--cluster-dns=10.0.64.0.10 \
+--cluster-domain=cluster.local"
+....
+#### Kube_proxy config ->  ``/etc/kubernetes/proxy``
+....
+###
+# kubernetes proxy config
+
+# default config should be adequate
+
+# Add your own!
+KUBE_PROXY_ARGS="--cluster-cidr=10.64.0.0/16 \
+--masquerade-all=true \
+--kubeconfig=/var/lib/kube-proxy/kubeconfig \
+--proxy-mode=iptables"
+....
+#### Start the worker components
+....
+sudo systemctl enable kubelet
+sudo systemctl start kubelet
+sudo systemctl enable kube-proxy
+sudo systemctl start kube-proxy
+....
+## Testing the cluster
+Now that we have deployed the cluster let's test it.
+
+### Test if Kuberenetes Api Server is Running
+Running ```kubectl version``` should return the version of both kubectl and kube-api-server
+....
+Client Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.8", GitCommit:"c138b85178156011dc934c2c9f4837476876fb07", GitTreeState:"clean", BuildDate:"2018-05-21T19:01:12Z", GoVersion:"go1.9.3", Compiler:"gc", Platform:"linux/s390x"}
+Server Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.8", GitCommit:"c138b85178156011dc934c2c9f4837476876fb07", GitTreeState:"clean", BuildDate:"2018-05-21T18:53:18Z", GoVersion:"go1.9.3", Compiler:"gc", Platform:"linux/s390x"}
+....
+### Test if all the components are healthy
+Running ```kubectl get componentstatus``` should return the status of all the components
+....
+NAME                 STATUS    MESSAGE             ERROR
+scheduler            Healthy   ok
+controller-manager   Healthy   ok
+etcd-0               Healthy   {"health":"true"}
+....
+### Test if the node is registered
+Running ```kubectl get nodes``` should return the nodes sucessfully registered with the server and status of each node.
+....
+NAME         STATUS    ROLES     AGE       VERSION
+k8s-worker   Ready     <none>    6d        v1.9.8
+....
+### Deploy ngninx
+Let's run an Ngnix app on the cluster.
+....
+kubectl run nginx --image=nginx --port=80 --replicas=3
+kubectl get pods -o wide
+kubectl expose deployment nginx --type NodePort
+NODE_PORT=$(kubectl get svc nginx --output=jsonpath='{range .spec.ports[0]}{.nodePort}')
+curl http://192.168.100.169:${NODE_PORT} #The IP is of Worker node
+....
+## Troubleshooting
+- If any of the Kubernetes component throws up an error, check the reason for the error by observing the logs
+of the service using ```journalctl -fu <service name>```
+- To debug a kubectl command, use the flag ```-v=<log level>```
+
+## References
+- https://github.com/linux-on-ibm-z/docs/wiki/Building-etcd
+- https://icicimov.github.io/blog/kubernetes/Kubernetes-cluster-step-by-step/
+- https://github.com/kelseyhightower/kubernetes-the-hard-way/tree/2983b28f13b294c6422a5600bb6f14142f5e7a26/docs
+- https://nixaid.com/deploying-kubernetes-cluster-from-scratch/
+- https://kubernetes.io
+- https://www.suse.com/documentation/sles-12/singlehtml/book_sles_docker/book_sles_docker.html
