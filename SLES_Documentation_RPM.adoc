@@ -40,11 +40,9 @@ For installing High Availability extension, you need to register on the SLES web
 There is a 60 day evaluation version available
 https://www.suse.com/products/highavailability/download/rwCbMRbm3iU~/?event_id=GSDGNweb29667&event_name=Eval:+SLE12+SP3+HAE+z+Systems&icid=GSDGNweb29702&icname=Eval:+SLE12+SP3+HAE+z+Systems+Nurture[here]
 +
-3. Make sure to set the hostname of both the machines to differentiate one machine from the other. Preferably
-name the machines as *_k8s-master_* for the Master node and *_k8s-worker_* for the Worker node
 // 3. Resource allocation of the nodes < Working >
-4. SSH into the nodes and follow the below steps in the nodes specified across each step
-5. Note down the IP addresses of both the nodes. In the context of this document, IP addresses of the nodes
+3. SSH into the nodes and follow the below steps in the nodes specified across each step
+4. Note down the IP addresses of both the nodes. In the context of this document, IP addresses of the nodes
 are as follows
 +
 [options="header,footer",width="50%"]
@@ -54,8 +52,11 @@ are as follows
 | Worker | [red]#192.168.100.169#
 |====
 +
-6. Make sure the firewall is disabled while installing the virtual machine, if not disable it
+5. Make sure the firewall is disabled while installing the virtual machine, if not disable it
 by running ```SuSEfirewall2 off```
+6. Make sure to set the hostname of both the machines to differentiate one machine from the other. Preferably
+name the machines as *_k8s-master_* for the Master node and *_k8s-worker_* for the Worker node. Hostname can
+be set using the command `hostnamectl set-hostname <hostname>`.
 7. Install docker on Worker node(s). To install docker on SLES, it is necessary to register the
 machine with the SLES server and download  add-on module _Containers Module 12 s390x_ as specified in step <<notice,step>>.
 Use the following commands to install docker.
@@ -137,18 +138,6 @@ openssl genrsa -out admin-key.pem 2048
 openssl req -new -key admin-key.pem -out admin.csr -subj "/CN=admin"
 openssl x509 -req -in admin.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out admin.pem -days 7200
 ....
-#### Kube-proxy certificates
-....
-openssl genrsa -out kube-proxy-key.pem 2048
-openssl req -new -key kube-proxy-key.pem -out kube-proxy.csr -subj "/CN=kube-proxy"
-openssl x509 -req -in kube-proxy.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kube-proxy.pem -days 7200
-....
-#### Kubelet certificates
-....
-openssl genrsa -out kubelet-key.pem 2048
-openssl req -new -key kubelet-key.pem -out kubelet.csr -subj "/CN=kubelet"
-openssl x509 -req -in kubelet.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kubelet.pem -days 7200
-....
 #### Kube-controller-manager certificates
 ....
 openssl genrsa -out kube-controller-manager-key.pem 2048
@@ -176,13 +165,18 @@ subjectAltName = @alt_names
 IP.1 = 192.168.100.169
 EOF
 ....
-#### Worker certificates
+#### Kube-proxy certificates (Worker)
 ....
-openssl genrsa -out ubuntu-worker-key.pem 2048
-WORKER_IP=192.168.100.169 openssl req -new -key ubuntu-worker-key.pem -out ubuntu-worker.csr \
--subj "/CN=ubuntu" -config worker-openssl.cnf
-WORKER_IP=192.168.100.169 openssl x509 -req -in ubuntu-worker.csr -CA ca.pem -CAkey ca-key.pem \
--CAcreateserial -out ubuntu-worker.pem -days 7200 -extensions v3_req -extfile worker-openssl.cnf
+openssl genrsa -out kube-proxy-key.pem 2048
+openssl req -new -key kube-proxy-key.pem -out kube-proxy.csr -subj "/CN=kube-proxy"
+openssl x509 -req -in kube-proxy.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kube-proxy.pem -days 7200
+....
+#### Kubelet certificates (Worker)
+Note: 'linux-xpuq' here refers to the hostname of the worker
+....
+openssl genrsa -out kubelet-key.pem 2048
+openssl req -new -key kubelet-key.pem -out kubelet.csr -subj "/CN=system:node:linux-xpuq"
+openssl x509 -req -in kubelet.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kubelet.pem -days 7200 -extensions v3_req -extfile worker-openssl.cnf
 ....
 #### Etcd OpenSSL config
 ....
@@ -206,6 +200,12 @@ openssl genrsa -out etcd.key 2048
 openssl req -new -key etcd.key -out etcd.csr -subj "/CN=etcd" -extensions v3_req -config etcd-openssl.cnf -sha256
 openssl x509 -req -sha256 -CA ca.pem -CAkey ca-key.pem -CAcreateserial \
 -in etcd.csr -out etcd.crt -extensions v3_req -extfile etcd-openssl.cnf -days 7200
+....
+#### Service Account Key Pair
+....
+openssl genrsa -out service-account-key.pem 2048
+openssl req -new -key service-account-key.pem -out service-account.csr -subj "/CN=service-account"
+openssl x509 -req -in service-account.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out service-account.pem -days 7200
 ....
 #### Copy the required certificates to the Worker node
 ....
@@ -303,6 +303,7 @@ ExecStart=/bin/bash -c "GOMAXPROCS=$(nproc) /usr/sbin/etcd --name=\"${ETCD_NAME}
 --peer-client-cert-auth \
 --client-cert-auth \
 --initial-advertise-peer-urls=\"${ETCD_INITIAL_ADVERTISE_PEER_URLS}\"  \
+--listen-peer-urls=\"${ETCD_LISTEN_PEER_URLS}\" \
 --advertise-client-urls=\"${ETCD_ADVERTISE_CLIENT_URLS}\"  \
 --initial-cluster-token=\"${ETCD_INITIAL_CLUSTER_TOKEN}\" \
 --initial-cluster=\"${ETCD_INITIAL_CLUSTER}\" \
@@ -557,7 +558,7 @@ KUBE_CONTROLLER_MANAGER_ARGS="--allocate-node-cidrs=true \
 --cluster-name=k8s.virtual.local \
 --leader-elect=true \
 --root-ca-file=/srv/kubernetes/ca.pem \
---service-account-private-key-file=/srv/kubernetes/apiserver-key.pem \
+--service-account-private-key-file=/srv/kubernetes/service-account-key.pem \
 --use-service-account-credentials=true \
 --kubeconfig=/var/lib/kube-controller-manager/kubeconfig \
 --cluster-signing-cert-file=/srv/kubernetes/ca.pem \

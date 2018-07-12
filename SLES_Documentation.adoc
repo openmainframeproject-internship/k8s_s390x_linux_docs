@@ -28,11 +28,9 @@ virtual machines using KVM on LinuxOne Community Cloud.
 
 ## Setting up the VMs before installing the components
 1. Create two virtual machines after setting up KVM as explained above and install ubuntu on both the nodes
-2. Make sure to set the hostname of both the machines to differentiate one machine from the other. Preferably
-name the machines as *_k8s-master_* for the Master node and *_k8s-worker_* for the Worker node
 // 3. Resource allocation of the nodes < Working >
-3. SSH into the nodes and follow the below steps in the nodes specified across each step
-4. Note down the IP addresses of both the nodes. In the context of this document, IP addresses of the nodes
+2. SSH into the nodes and follow the below steps in the nodes specified across each step
+3. Note down the IP addresses of both the nodes. In the context of this document, IP addresses of the nodes
 are as follows
 +
 [options="header,footer",width="50%"]
@@ -42,8 +40,11 @@ are as follows
 | Worker | [red]#192.168.100.169#
 |====
 +
-5. Make sure the firewall is disabled while installing the virtual machine, if not disable it
+4. Make sure the firewall is disabled while installing the virtual machine, if not disable it
 by running ```SuSEfirewall2 off```
+5. Make sure to set the hostname of both the machines to differentiate one machine from the other. Preferably
+name the machines as *_k8s-master_* for the Master node and *_k8s-worker_* for the Worker node. Hostname can
+be set using the command `hostnamectl set-hostname <hostname>`.
 6. Install *Go* on the Master node. Go installation is needed to build *etcd* in the later stages
 +
 ....
