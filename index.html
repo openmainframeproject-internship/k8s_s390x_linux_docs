@@ -438,45 +438,39 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <span id="author" class="author">Rajula Vineet Reddy</span><br>
 <span id="email" class="email"><a href="mailto:rajula96reddy@gmail.com">rajula96reddy@gmail.com</a></span><br>
 <span id="revnumber">version 1.0,</span>
-<span id="revdate">2018-07-02</span>
+<span id="revdate">2018-07-18</span>
 </div>
 <div id="toc" class="toc2">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel1">
 <li><a href="#_versions_of_all_the_components_used">Versions of all the components used</a></li>
-<li><a href="#_kvm_setup">KVM Setup</a></li>
-<li><a href="#_setting_up_the_vms_before_installing_the_components">Setting up the VMs before installing the components</a></li>
+<li><a href="#_node_setup">Node Setup</a></li>
+<li><a href="#_installing_the_required_components_on_the_nodes">Installing the required components on the nodes</a>
+<ul class="sectlevel2">
+<li><a href="#_components_on_master_node">Components on Master node</a></li>
+<li><a href="#_components_on_worker_nodes">Components on Worker node(s)</a></li>
+</ul>
+</li>
 <li><a href="#_creating_certificates_authentication_to_enable_secure_communication_across_all_the_kubernetes_components">Creating Certificates &amp; Authentication to enable secure communication across all the Kubernetes components</a>
 <ul class="sectlevel2">
 <li><a href="#_generating_certificates">Generating Certificates</a></li>
 <li><a href="#_generating_kubeconfig_files">Generating Kubeconfig files</a></li>
 </ul>
 </li>
-<li><a href="#_downloading_all_the_components_rpm_files">Downloading all the components RPM files</a>
-<ul class="sectlevel2">
-<li><a href="#_few_important_rpm_commands_that_might_be_useful_in_this_setup">Few important RPM commands that might be useful in this setup</a></li>
-</ul>
-</li>
 <li><a href="#_setting_up_etcd">Setting Up Etcd</a>
 <ul class="sectlevel2">
-<li><a href="#_downloading_installing_etcd_rpm_packages">Downloading &amp; Installing Etcd RPM packages</a></li>
 <li><a href="#_modifying_the_etcd_systemd_service_its_configuration">Modifying the Etcd systemd service &amp; its configuration</a></li>
 <li><a href="#_test_etcd_cluster">Test etcd cluster</a></li>
 </ul>
 </li>
 <li><a href="#_setting_up_flannel">Setting up Flannel</a>
 <ul class="sectlevel2">
-<li><a href="#_dowloading_installing_the_flannel_rpm_package">Dowloading &amp; Installing the Flannel RPM package</a></li>
+<li><a href="#_adding_an_entry_to_etcd">Adding an entry to etcd</a></li>
 <li><a href="#_configure_flannel_settings">Configure Flannel Settings</a></li>
 <li><a href="#_testing_flanneld">Testing flanneld</a></li>
 </ul>
 </li>
-<li><a href="#_setting_up_kubernetes_binaries_on_the_nodes">Setting up Kubernetes binaries on the Nodes</a>
-<ul class="sectlevel2">
-<li><a href="#_downloading_installing_the_rpm_packages">Downloading &amp; Installing the RPM Packages</a></li>
-</ul>
-</li>
-<li><a href="#_modifying_the_configuration_files_of_the_components">Modifying the configuration files of the components</a>
+<li><a href="#_setting_up_kubernetes_components_on_the_nodes">Setting up Kubernetes components on the Nodes</a>
 <ul class="sectlevel2">
 <li><a href="#_master_components">Master Components</a></li>
 <li><a href="#_worker_components">Worker Components</a></li>
@@ -501,6 +495,10 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div class="paragraph">
 <p><strong>Note:</strong> This setup documents running a two node (1 Master &amp; 1 Worker) Kubernetes Cluster
 on LinuxOne cloud using LinuxOne supported linux distribution <strong>SUSE Linux Enterprise Server 12 SP3</strong>.</p>
+</div>
+<div class="paragraph">
+<p>Also please do note that, all the lines starting with <strong>#</strong> in the code blocks
+are comments and are not intended to be ran, although they are harmless when ran ;).</p>
 </div>
 </div>
 </div>
@@ -532,14 +530,6 @@ with <strong>flannel</strong> as the overlay networking model. The versions of e
 <td class="tableblock halign-left valign-top"><p class="tableblock">SLES12SP3</p></td>
 </tr>
 <tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">SLES VMs</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">SLES12SP3</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Go</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">1.10.2</p></td>
-</tr>
-<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Kubernetes</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">1.9.6</p></td>
 </tr>
@@ -549,7 +539,7 @@ with <strong>flannel</strong> as the overlay networking model. The versions of e
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Etcd</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">3.3.6</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3.3.1</p></td>
 </tr>
 </tbody>
 <tfoot>
@@ -562,50 +552,25 @@ with <strong>flannel</strong> as the overlay networking model. The versions of e
 </div>
 </div>
 <div class="sect1">
-<h2 id="_kvm_setup">KVM Setup</h2>
+<h2 id="_node_setup">Node Setup</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>Refer to this <a href="https://gist.github.com/rajula96reddy/a9065c75d0b7c1b9f5472e0d480f31eb">gist</a> to setup
-virtual machines using KVM on LinuxOne Community Cloud.</p>
+<p>This setup requires about 2 LinuxOne cloud instances. One for master and one for worker. Make sure you chose the SLES12SP3 flavour for both the
+instances while provisioning. SSH into the nodes and follow the below steps in the nodes specified across each step</p>
 </div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_setting_up_the_vms_before_installing_the_components">Setting up the VMs before installing the components</h2>
-<div class="sectionbody">
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p>Create two virtual machines after setting up KVM as explained above and install SLES12 SP3 on both the nodes</p>
-</li>
-<li>
-<p><a id="notice"></a>
-While installing make sure to register the VM&#8217;s with the SLES server and install the following <em>System Extensions or Add-Ons</em>.</p>
-<div class="ulist">
-<ul>
-<li>
-<p>Containers Module 12 s390x (On both Master &amp; Worker)</p>
-</li>
-<li>
-<p>SUSE Linux Enterprise High Availability Extension 12 SP3 s390x (On Worker)</p>
-<div class="paragraph">
-<p>You might need to register on <a href="https://www.suse.com/">SLES website</a> to get the registration code for installing. There is a free 60 day
-Evaluation version available
-<a href="https://www.suse.com/products/server/download/15BQH2uh8KU~/?event_id=GSDGNweb29583&amp;event_name=Eval:+SP3-+z+systems+and+LinuxONE&amp;icid=GSDGNweb29663&amp;icname=Eval:+SP3-+z+systems+and+LinuxONE+Nurture">here</a>.
-For installing High Availability extension, you need to register on the SLES website apart from the previous registration.
-There is a 60 day evaluation version available
-<a href="https://www.suse.com/products/highavailability/download/rwCbMRbm3iU~/?event_id=GSDGNweb29667&amp;event_name=Eval:+SLE12+SP3+HAE+z+Systems&amp;icid=GSDGNweb29702&amp;icname=Eval:+SLE12+SP3+HAE+z+Systems+Nurture">here</a></p>
+<p>Set the hostnames for each of the nodes using the utility <code>hostnamectl</code> as follows. Preferrably
+set the hostnames as <strong>k8s-master</strong> &amp; <strong>k8s-worker</strong> respectively.</p>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code># On Master Node
+hostnamectl set-hostname k8s-master
+# On Worker Node
+hostnamectl set-hostname k8s-worker</code></pre>
 </div>
-</li>
-</ul>
 </div>
-</li>
-<li>
-<p>Make sure to set the hostname of both the machines to differentiate one machine from the other. Preferably
-name the machines as <strong><em>k8s-master</em></strong> for the Master node and <strong><em>k8s-worker</em></strong> for the Worker node</p>
-</li>
-<li>
-<p>SSH into the nodes and follow the below steps in the nodes specified across each step</p>
 </li>
 <li>
 <p>Note down the IP addresses of both the nodes. In the context of this document, IP addresses of the nodes
@@ -624,30 +589,28 @@ are as follows</p>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Master</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><span class="red">192.168.100.230</span></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><span class="red">148.100.10.15</span></p></td>
 </tr>
 </tbody>
 <tfoot>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Worker</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><span class="red">192.168.100.169</span></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><span class="red">148.100.10.16</span></p></td>
 </tr>
 </tfoot>
 </table>
 </li>
 <li>
-<p>Make sure the firewall is disabled while installing the virtual machine, if not disable it
+<p>Make sure the firewall is disabled on both the nodes, if not disable it
 by running <code><code>SuSEfirewall2 off</code></code></p>
 </li>
 <li>
-<p>Install docker on Worker node(s). To install docker on SLES, it is necessary to register the
-machine with the SLES server and download  add-on module <em>Containers Module 12 s390x</em> as specified in step <a href="#notice">step</a>.
-Use the following commands to install docker.</p>
+<p>Check if docker is installed and the daemon is running on both the nodes
+by running the following commands.</p>
 <div class="literalblock">
 <div class="content">
-<pre>sudo zypper install -y docker
-sudo systemctl enable docker.service
-sudo systemctl start docker.service</pre>
+<pre>sudo systemctl status docker
+docker version</pre>
 </div>
 </div>
 </li>
@@ -680,14 +643,58 @@ sudo mkdir /var/lib/flanneld/</pre>
 </li>
 <li>
 <p>It is recommended to run Kubernetes without using swap memory.
-Disable swap space on all the nodes, by running</p>
-</li>
-</ol>
-</div>
+Disable swap space on the <strong>worker</strong> node(s), by running</p>
 <div class="literalblock">
 <div class="content">
 <pre>swapoff -a
 sudo sed -i 's/.*swap/#&amp;/' /etc/fstab</pre>
+</div>
+</div>
+</li>
+<li>
+<p>Copy the worker node ssh keys on to the master node using scp from the system you are
+logging in from. The command should be on the lines of</p>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code>scp -i &lt;master_node&gt;.pem &lt;worker_node&gt;.pem linux1@148.100.10.15:/home/linux1/</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Here <strong>&lt;master_node&gt;.pem</strong> refers to the master node ssh key and <strong>&lt;worker_node&gt;.pem</strong> refers to
+the worker node ssh key, Do change it accordingly.</p>
+</div>
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_installing_the_required_components_on_the_nodes">Installing the required components on the nodes</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>We need to download all the required components such as Kubernetes packages, Etcd, Flanneld on both the nodes.
+Run the following commands on the nodes specified.</p>
+</div>
+<div class="sect2">
+<h3 id="_components_on_master_node">Components on Master node</h3>
+<div class="literalblock">
+<div class="content">
+<pre>zypper ar -fc https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/ kubernetes
+zypper refresh
+# choose trust always <strong>'a'</strong>
+zypper in etcd etcdctl kubernetes-master kubernetes-client flannel</pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="_components_on_worker_nodes">Components on Worker node(s)</h3>
+<div class="literalblock">
+<div class="content">
+<pre>zypper ar -fc https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/ kubernetes
+zypper refresh
+# choose trust always <strong>'a'</strong>
+zypper in kubernetes-node flannel</pre>
+</div>
 </div>
 </div>
 </div>
@@ -733,7 +740,8 @@ DNS.2 = kubernetes.default
 DNS.3 = kubernetes.default.svc
 DNS.4 = kubernetes.default.svc.cluster.local
 IP.1 = 127.0.0.1
-IP.2 = 192.168.100.230 # Master IP
+IP.2 = 148.100.10.15 # Master IP
+IP.3 = 100.65.0.1 #Service IP
 EOF</pre>
 </div>
 </div>
@@ -745,9 +753,7 @@ EOF</pre>
 <pre>openssl genrsa -out apiserver-key.pem 2048
 openssl req -new -key apiserver-key.pem -out apiserver.csr -subj "/CN=kube-apiserver" -config openssl.cnf
 openssl x509 -req -in apiserver.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial \
--out apiserver.pem -days 7200 -extensions v3_req -extfile openssl.cnf
-cp apiserver.pem server.crt
-cp apiserver-key.pem server.key</pre>
+-out apiserver.pem -days 7200 -extensions v3_req -extfile openssl.cnf</pre>
 </div>
 </div>
 </div>
@@ -758,26 +764,6 @@ cp apiserver-key.pem server.key</pre>
 <pre>openssl genrsa -out admin-key.pem 2048
 openssl req -new -key admin-key.pem -out admin.csr -subj "/CN=admin"
 openssl x509 -req -in admin.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out admin.pem -days 7200</pre>
-</div>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_kube_proxy_certificates">Kube-proxy certificates</h4>
-<div class="literalblock">
-<div class="content">
-<pre>openssl genrsa -out kube-proxy-key.pem 2048
-openssl req -new -key kube-proxy-key.pem -out kube-proxy.csr -subj "/CN=kube-proxy"
-openssl x509 -req -in kube-proxy.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kube-proxy.pem -days 7200</pre>
-</div>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_kubelet_certificates">Kubelet certificates</h4>
-<div class="literalblock">
-<div class="content">
-<pre>openssl genrsa -out kubelet-key.pem 2048
-openssl req -new -key kubelet-key.pem -out kubelet.csr -subj "/CN=kubelet"
-openssl x509 -req -in kubelet.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kubelet.pem -days 7200</pre>
 </div>
 </div>
 </div>
@@ -815,20 +801,31 @@ basicConstraints = CA:FALSE
 keyUsage = nonRepudiation, digitalSignature, keyEncipherment
 subjectAltName = @alt_names
 [alt_names]
-IP.1 = 192.168.100.169
+IP.1 = 148.100.10.16
 EOF</pre>
 </div>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_worker_certificates">Worker certificates</h4>
+<h4 id="_kube_proxy_certificates_worker">Kube-proxy certificates (Worker)</h4>
 <div class="literalblock">
 <div class="content">
-<pre>openssl genrsa -out ubuntu-worker-key.pem 2048
-WORKER_IP=192.168.100.169 openssl req -new -key ubuntu-worker-key.pem -out ubuntu-worker.csr \
--subj "/CN=ubuntu" -config worker-openssl.cnf
-WORKER_IP=192.168.100.169 openssl x509 -req -in ubuntu-worker.csr -CA ca.pem -CAkey ca-key.pem \
--CAcreateserial -out ubuntu-worker.pem -days 7200 -extensions v3_req -extfile worker-openssl.cnf</pre>
+<pre>openssl genrsa -out kube-proxy-key.pem 2048
+openssl req -new -key kube-proxy-key.pem -out kube-proxy.csr -subj "/CN=kube-proxy"
+openssl x509 -req -in kube-proxy.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kube-proxy.pem -days 7200</pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_kubelet_certificates_worker">Kubelet certificates (Worker)</h4>
+<div class="paragraph">
+<p>Note: 'k8s-worker' here refers to the hostname of the worker</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>openssl genrsa -out kubelet-key.pem 2048
+openssl req -new -key kubelet-key.pem -out kubelet.csr -subj "/CN=system:node:k8s-worker"
+openssl x509 -req -in kubelet.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kubelet.pem -days 7200 -extensions v3_req -extfile worker-openssl.cnf</pre>
 </div>
 </div>
 </div>
@@ -847,7 +844,7 @@ keyUsage = nonRepudiation, digitalSignature, keyEncipherment
 extendedKeyUsage = clientAuth,serverAuth
 subjectAltName = @alt_names
 [alt_names]
-IP.1 = 192.168.100.230
+IP.1 = 148.100.10.15
 EOF</pre>
 </div>
 </div>
@@ -867,7 +864,11 @@ openssl x509 -req -sha256 -CA ca.pem -CAkey ca-key.pem -CAcreateserial \
 <h4 id="_copy_the_required_certificates_to_the_worker_node">Copy the required certificates to the Worker node</h4>
 <div class="literalblock">
 <div class="content">
-<pre>scp ca.pem etcd.crt etcd.key server.crt server.key root@192.168.100.169:/srv/kubernetes/</pre>
+<pre># Run the below step on the Master node
+scp -i &lt;path to worker.pem&gt; ca.pem etcd.crt etcd.key kubelet.key kubelet-key.pem linux1@148.100.10.16:/home/linux1/
+# Run the below step on the Worker node
+sudo cp /home/linux1/{*.pem,*.crt,*.key} /srv/kubernetes/
+# This is required because, the permissions associated with li1cc key doesn't allow us to directly copy to root folders</pre>
 </div>
 </div>
 </div>
@@ -879,7 +880,7 @@ openssl x509 -req -sha256 -CA ca.pem -CAkey ca-key.pem -CAcreateserial \
 <div class="literalblock">
 <div class="content">
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.230:6443
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.10.15:6443
 kubectl config set-credentials admin --client-certificate=/srv/kubernetes/admin.pem --client-key=/srv/kubernetes/admin-key.pem --embed-certs=true --token=$TOKEN
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=admin
 kubectl config use-context linux1.k8s
@@ -892,7 +893,7 @@ cat ~/.kube/config #Create config file</pre>
 <div class="literalblock">
 <div class="content">
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.230:6443 --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.10.15:6443 --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
 kubectl config set-credentials kube-controller-manager --client-certificate=/srv/kubernetes/kube-controller-manager.pem --client-key=/srv/kubernetes/kube-controller-manager-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-controller-manager --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
 kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-controller-manager/kubeconfig</pre>
@@ -904,7 +905,7 @@ kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-controller-mana
 <div class="literalblock">
 <div class="content">
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.230:6443 --kubeconfig=/var/lib/kube-scheduler/kubeconfig
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.10.15:6443 --kubeconfig=/var/lib/kube-scheduler/kubeconfig
 kubectl config set-credentials kube-scheduler --client-certificate=/srv/kubernetes/kube-scheduler.pem --client-key=/srv/kubernetes/kube-scheduler-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/var/lib/kube-scheduler/kubeconfig
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-scheduler --kubeconfig=/var/lib/kube-scheduler/kubeconfig
 kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-scheduler/kubeconfig</pre>
@@ -916,11 +917,10 @@ kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-scheduler/kubec
 <div class="literalblock">
 <div class="content">
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.230:6443 --kubeconfig=kubelet.kubeconfig
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.10.15:6443 --kubeconfig=kubelet.kubeconfig
 kubectl config set-credentials kubelet --client-certificate=/srv/kubernetes/kubelet.pem --client-key=/srv/kubernetes/kubelet-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=kubelet.kubeconfig
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kubelet --kubeconfig=kubelet.kubeconfig
-kubectl config use-context linux1.k8s --kubeconfig=kubelet.kubeconfig
-scp kubelet.kubeconfig root@192.168.100.169:/var/lib/kubelet/kubeconfig</pre>
+kubectl config use-context linux1.k8s --kubeconfig=kubelet.kubeconfig</pre>
 </div>
 </div>
 </div>
@@ -929,41 +929,29 @@ scp kubelet.kubeconfig root@192.168.100.169:/var/lib/kubelet/kubeconfig</pre>
 <div class="literalblock">
 <div class="content">
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://192.168.100.230:6443 --kubeconfig=kube-proxy.kubeconfig
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.10.15:6443 --kubeconfig=kube-proxy.kubeconfig
 kubectl config set-credentials kube-proxy --client-certificate=/srv/kubernetes/kube-proxy.pem --client-key=/srv/kubernetes/kube-proxy-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=kube-proxy.kubeconfig
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-proxy --kubeconfig=kube-proxy.kubeconfig
 kubectl config use-context linux1.k8s --kubeconfig=kube-proxy.kubeconfig
-scp kube-proxy.kubeconfig root@192.168.100.169:/var/lib/kube-proxy/kubeconfig</pre>
+scp kube-proxy.kubeconfig root@148.100.10.16:/var/lib/kube-proxy/kubeconfig</pre>
 </div>
 </div>
 </div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_downloading_all_the_components_rpm_files">Downloading all the components RPM files</h2>
-<div class="sectionbody">
+<div class="sect3">
+<h4 id="_copy_the_required_config_files_to_the_worker_nodes">Copy the required config files to the worker node(s)</h4>
 <div class="paragraph">
-<p>In this setup, we will install all the components using RPM files build for SLES using SUSE Open Build Service
-from <a href="https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/">here</a></p>
+<p>Similar to how we copied the certificates, we need to copy the configurations to the worker node(s)</p>
 </div>
-<div class="sect2">
-<h3 id="_few_important_rpm_commands_that_might_be_useful_in_this_setup">Few important RPM commands that might be useful in this setup</h3>
-<div class="ulist">
-<ul>
-<li>
-<p><code>rpm -qpi file.rpm</code> &#8594; Gives detailed information about the package</p>
-</li>
-<li>
-<p><code>rpm -qpl file.rpm</code> &#8594; Shows all the files installed by the package</p>
-</li>
-<li>
-<p><code>rpm -qp --requires file.rpm</code> &#8594; Lists all dependencies required by the package</p>
-</li>
-<li>
-<p><code>rpm -U file.rpm</code> &#8594; Installs the package</p>
-</li>
-</ul>
+<div class="literalblock">
+<div class="content">
+<pre># Run the below command on the master node
+scp -i &lt;worker.pem&gt; kubelet.kubeconfig kube-proxy.kubeconfig linux1@148.100.10.16:/home/linux1/
+# &lt;worker.pem&gt; here refers to the worker node key
+# Run the below commands on the worker node
+sudo cp /home/linux1/kubelet.kubeconfig /var/lib/kubelet/kubeconfig
+sudo cp /home/linux1/kube-proxy.kubeconfig /var/lib/kube-proxy/kubeconfig</pre>
+</div>
+</div>
 </div>
 </div>
 </div>
@@ -972,21 +960,9 @@ from <a href="https://download.opensuse.org/repositories/home:/mfriesenegger:/br
 <h2 id="_setting_up_etcd">Setting Up Etcd</h2>
 <div class="sectionbody">
 <div class="sect2">
-<h3 id="_downloading_installing_etcd_rpm_packages">Downloading &amp; Installing Etcd RPM packages</h3>
-<div class="literalblock">
-<div class="content">
-<pre>cd ~/
-wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/etcd-3.3.1-3.1.s390x.rpm
-wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/etcdctl-3.3.1-3.1.s390x.rpm
-rpm -U etcd-3.3.1-3.1.s390x.rpm
-rpm -U etcdctl-3.3.1-3.1.s390x.rpm</pre>
-</div>
-</div>
-</div>
-<div class="sect2">
 <h3 id="_modifying_the_etcd_systemd_service_its_configuration">Modifying the Etcd systemd service &amp; its configuration</h3>
 <div class="paragraph">
-<p>Modify the file <code>/usr/lib/systemd/system</code> as shown below (Red indicates the modifications to the file)</p>
+<p>Modify the file <code>/usr/lib/systemd/system/etcd.service</code> as shown below (Red indicates the modifications to the file)</p>
 </div>
 <div class="literalblock">
 <div class="content">
@@ -1015,6 +991,7 @@ ExecStart=/bin/bash -c "GOMAXPROCS=$(nproc) /usr/sbin/etcd --name=\"${ETCD_NAME}
 --peer-client-cert-auth \
 --client-cert-auth \
 --initial-advertise-peer-urls=\"${ETCD_INITIAL_ADVERTISE_PEER_URLS}\"  \
+--listen-peer-urls=\"${ETCD_LISTEN_PEER_URLS}\" \
 --advertise-client-urls=\"${ETCD_ADVERTISE_CLIENT_URLS}\"  \
 --initial-cluster-token=\"${ETCD_INITIAL_CLUSTER_TOKEN}\" \
 --initial-cluster=\"${ETCD_INITIAL_CLUSTER}\" \
@@ -1042,19 +1019,19 @@ ETCD_DATA_DIR="/var/lib/etcd"
 #ETCD_SNAPSHOT_COUNT="10000"
 #ETCD_HEARTBEAT_INTERVAL="100"
 #ETCD_ELECTION_TIMEOUT="1000"
-ETCD_LISTEN_PEER_URLS="https://192.168.100.230:2380"
-ETCD_LISTEN_CLIENT_URLS="https://192.168.100.230:2379,http://127.0.0.1:2379"
+ETCD_LISTEN_PEER_URLS="https://148.100.10.15:2380"
+ETCD_LISTEN_CLIENT_URLS="https://148.100.10.15:2379"
 #ETCD_MAX_SNAPSHOTS="5"
 #ETCD_MAX_WALS="5"
 #ETCD_CORS=""
 #
 #[cluster]
-ETCD_INITIAL_ADVERTISE_PEER_URLS="https://192.168.100.230:2380"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="https://148.100.10.15:2380"
 # if you use different ETCD_NAME (e.g. test), set ETCD_INITIAL_CLUSTER value for this name, i.e. "test=http://..."
-ETCD_INITIAL_CLUSTER="master=https://192.168.100.230:2380"
+ETCD_INITIAL_CLUSTER="master=https://148.100.10.15:2380"
 ETCD_INITIAL_CLUSTER_STATE="new"
 ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster-0"
-ETCD_ADVERTISE_CLIENT_URLS="https://192.168.100.230:2379"
+ETCD_ADVERTISE_CLIENT_URLS="https://148.100.10.15:2379"
 #ETCD_DISCOVERY=""
 #ETCD_DISCOVERY_SRV=""
 #ETCD_DISCOVERY_FALLBACK="proxy"
@@ -1094,6 +1071,13 @@ sudo systemctl enable etcd
 sudo systemctl start etcd</pre>
 </div>
 </div>
+<div class="paragraph">
+<p>At times, as the <strong>ETCD_DATA_DIR</strong> is given as <strong>/var/lib/etcd</strong> there is high
+chance of running out of space, in that we need to change the <strong>ETCD_DATA_DIR</strong>
+variable in <code>/var/sysconfig/etcd</code> file and also the new folder need to be
+given appropriate permissions for the <strong>etcd</strong> user (as the systemd file is running as etcd user)
+using the command <code>chown -R etcd:etcd &lt;new_folder_path</code>&gt;</p>
+</div>
 </div>
 <div class="sect2">
 <h3 id="_test_etcd_cluster">Test etcd cluster</h3>
@@ -1112,26 +1096,17 @@ sudo systemctl start etcd</pre>
 <h2 id="_setting_up_flannel">Setting up Flannel</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>Flannel should be installed on all the nodes</p>
+<p>Flannel should be installed on all the nodes. Do the following steps
+on all the nodes.</p>
 </div>
 <div class="sect2">
-<h3 id="_dowloading_installing_the_flannel_rpm_package">Dowloading &amp; Installing the Flannel RPM package</h3>
-<div class="literalblock">
-<div class="content">
-<pre>cd ~/Downloads
-wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/flannel-0.9.1-5.2.s390x.rpm
-rpm -U flannel-0.9.1-5.2.s390x.rpm</pre>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_adding_an_entry_to_etcd">Adding an entry to etcd</h4>
+<h3 id="_adding_an_entry_to_etcd">Adding an entry to etcd</h3>
 <div class="paragraph">
 <p>This should be run only once and only on the Master node</p>
 </div>
 <div class="literalblock">
 <div class="content">
 <pre>etcdctl --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'</pre>
-</div>
 </div>
 </div>
 </div>
@@ -1146,14 +1121,15 @@ file <code>/etc/sysconfig/flanneld</code> as shown below</p>
 <pre># Flanneld configuration options
 
 # etcd url location.  Point this to the server where etcd runs
-FLANNEL_ETCD_ENDPOINTS="https://192.168.100.230:2379"
+FLANNEL_ETCD_ENDPOINTS="https://148.100.10.15:2379"
 # ETCD Prefix for the -etcd-prefix argument
 FLANNEL_ETCD_KEY="/coreos.com/network"
 # Any additional options that you want to pass
 FLANNEL_OPTIONS="-subnet-file=/var/lib/flanneld/subnet.env \
 -etcd-cafile=/srv/kubernetes/ca.pem \
 -etcd-certfile=/srv/kubernetes/etcd.crt \
--etcd-keyfile=/srv/kubernetes/etcd.key"</pre>
+-etcd-keyfile=/srv/kubernetes/etcd.key \
+-ip-masq=true"</pre>
 </div>
 </div>
 <div class="sect3">
@@ -1172,6 +1148,11 @@ add extra arguments for docker executable as follows</p>
 #
 DOCKER_OPTS="--bip=100.64.98.1/24 --mtu=1450 --iptables=false --ip-masq=false --ip-forward=true"</pre>
 </div>
+</div>
+<div class="paragraph">
+<p>For the values of <em>bip</em>,<em>mtu</em> refer to the file <code>/var/lib/flannel/subnet.env</code> on each of the nodes separately.
+<em>bip</em> is the value of the variable <em>FLANNEL_SUBNET</em> and <em>mtu</em> is the value of
+the variable <em>FLANNEL_MTU</em> in the above file.</p>
 </div>
 <div class="paragraph">
 <p>Then run the following commands</p>
@@ -1197,41 +1178,7 @@ the IP of the nodes on the flannel networks can be seen by running <code><code>i
 </div>
 </div>
 <div class="sect1">
-<h2 id="_setting_up_kubernetes_binaries_on_the_nodes">Setting up Kubernetes binaries on the Nodes</h2>
-<div class="sectionbody">
-<div class="sect2">
-<h3 id="_downloading_installing_the_rpm_packages">Downloading &amp; Installing the RPM Packages</h3>
-<div class="sect3">
-<h4 id="_master_node">Master Node</h4>
-<div class="literalblock">
-<div class="content">
-<pre>wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/kubernetes-common-1.9.6-6.1.s390x.rpm
-wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/kubernetes-master-1.9.6-6.1.s390x.rpm
-wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/kubernetes-client-1.9.6-6.1.s390x.rpm
-rpm -U kubernetes-common-1.9.6-6.1.s390x.rpm
-rpm -U kubernetes-master-1.9.6-6.1.s390x.rpm
-rpm -U kubernetes-client-1.9.6-6.1.s390x.rpm</pre>
-</div>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_worker_node">Worker Node</h4>
-<div class="literalblock">
-<div class="content">
-<pre>wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/kubernetes-common-1.9.6-6.1.s390x.rpm
-wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/kubernetes-kubelet-1.9.6-6.1.s390x.rpm
-wget https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/s390x/kubernetes-node-1.9.6-6.1.s390x.rpm
-rpm -U kubernetes-common-1.9.6-6.1.s390x.rpm
-rpm -U kubernetes-kubelet-1.9.6-6.1.s390x.rpm
-rpm -U kubernetes-node-1.9.6-6.1.s390x.rpm</pre>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_modifying_the_configuration_files_of_the_components">Modifying the configuration files of the components</h2>
+<h2 id="_setting_up_kubernetes_components_on_the_nodes">Setting up Kubernetes components on the Nodes</h2>
 <div class="sectionbody">
 <div class="sect2">
 <h3 id="_master_components">Master Components</h3>
@@ -1262,7 +1209,7 @@ KUBE_LOG_LEVEL="--v=5"
 KUBE_ALLOW_PRIV="--allow-privileged=true"
 
 # How the controller-manager, and proxy find the apiserver
-KUBE_MASTER="--master=https://192.168.100.230:6443"</pre>
+KUBE_MASTER="--master=https://148.100.10.15:6443"</pre>
 </div>
 </div>
 </div>
@@ -1277,7 +1224,7 @@ KUBE_MASTER="--master=https://192.168.100.230:6443"</pre>
 #
 
 # The address on the local server to listen to.
-KUBE_API_ADDRESS="--insecure-bind-address=0.0.0.0"
+KUBE_API_ADDRESS=""
 
 # The port on the local server to listen on.
 # KUBE_API_PORT="--port=8080"
@@ -1286,7 +1233,7 @@ KUBE_API_ADDRESS="--insecure-bind-address=0.0.0.0"
 # KUBELET_PORT="--kubelet-port=10250"
 
 # Comma separated list of nodes in the etcd cluster
-KUBE_ETCD_SERVERS="--etcd-servers=https://192.168.100.230:2379"
+KUBE_ETCD_SERVERS="--etcd-servers=https://148.100.10.15:2379"
 
 # Address range to use for services
 KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=100.65.0.0/24"
@@ -1296,13 +1243,14 @@ KUBE_ADMISSION_CONTROL="--admission-control=NamespaceLifecycle,LimitRanger,Servi
 
 # Add your own!
 KUBE_API_ARGS="--bind-address=0.0.0.0 \
---advertise-address=192.168.100.230 \
+--advertise-address=148.100.10.15 \
 --anonymous-auth=false \
 --apiserver-count=1 \
---authorization-mode=RBAC,AlwaysAllow \
+--authorization-mode=Node,AlwaysAllow,RBAC \
 --etcd-cafile=/srv/kubernetes/ca.pem \
 --etcd-certfile=/srv/kubernetes/etcd.crt \
 --etcd-keyfile=/srv/kubernetes/etcd.key \
+--etcd-servers=https://148.100.10.15:2379 \
 --enable-swagger-ui=false \
 --event-ttl=1h \
 --kubelet-certificate-authority=/srv/kubernetes/ca.pem \
@@ -1311,6 +1259,7 @@ KUBE_API_ARGS="--bind-address=0.0.0.0 \
 --kubelet-https=true \
 --client-ca-file=/srv/kubernetes/ca.pem \
 --runtime-config=api/all=true,batch/v2alpha1=true,rbac.authorization.k8s.io/v1alpha1=true \
+--service-node-port-range=30000-32767 \
 --secure-port=6443 \
 --storage-backend=etcd3 \
 --tls-cert-file=/srv/kubernetes/apiserver.pem \
@@ -1345,6 +1294,7 @@ KUBE_SCHEDULER_ARGS="--leader-elect=true \
 
 # Add your own!
 KUBE_CONTROLLER_MANAGER_ARGS="--allocate-node-cidrs=true \
+--address=0.0.0.0 \
 --attach-detach-reconcile-sync-period=1m0s \
 --cluster-cidr=100.64.0.0/16 \
 --cluster-name=k8s.virtual.local \
@@ -1356,7 +1306,7 @@ KUBE_CONTROLLER_MANAGER_ARGS="--allocate-node-cidrs=true \
 --cluster-signing-cert-file=/srv/kubernetes/ca.pem \
 --cluster-signing-key-file=/srv/kubernetes/ca-key.pem \
 --service-cluster-ip-range=100.65.0.0/24 \
---configure-cloud-routes=false "</pre>
+--configure-cloud-routes=false"</pre>
 </div>
 </div>
 </div>
@@ -1400,7 +1350,7 @@ KUBE_LOG_LEVEL="--v=2"
 KUBE_ALLOW_PRIV="--allow-privileged=true"
 
 # How the controller-manager, and proxy find the apiserver
-KUBE_MASTER="--master=https://192.168.100.230:6443"</pre>
+KUBE_MASTER="--master=https://148.100.10.15:6443"</pre>
 </div>
 </div>
 </div>
@@ -1412,25 +1362,30 @@ KUBE_MASTER="--master=https://192.168.100.230:6443"</pre>
 # kubernetes kubelet (minion) config
 
 # The address for the info server to serve on (set to 0.0.0.0 or "" for all interfaces)
-KUBELET_ADDRESS="192.168.100.169"
+KUBELET_ADDRESS="--address=148.100.10.16"
 
 # The port for the info server to serve on
-# KUBELET_PORT=""
+# KUBELET_PORT="--port=10250"
 
 # You may leave this blank to use the actual hostname
-KUBELET_HOSTNAME=""
+#KUBELET_HOSTNAME="--hostname-override=127.0.0.1"
+KUBELET_HOSTNAME="--hostname-override=148.100.10.16"
 
 # Add your own!
 KUBELET_ARGS="--pod-manifest-path=/etc/kubernetes/manifests \
 --kubeconfig=/var/lib/kubelet/kubeconfig \
---tls-cert-file=/srv/kubernetes/server.crt \
---tls-private-key-file=/srv/kubernetes/server.key \
---cert-dir=/var/lib/1_kubelet \
+--tls-cert-file=/srv/kubernetes/kubelet.pem \
+--tls-private-key-file=/srv/kubernetes/kubelet-key.pem \
+--cert-dir=/var/lib/kubelet \
 --container-runtime=docker \
 --serialize-image-pulls=false \
 --register-node=true \
---cluster-dns=10.0.64.0.10 \
---cluster-domain=cluster.local"</pre>
+--cluster-dns=100.65.0.10 \
+--cluster-domain=cluster.local \
+--runtime-cgroups=/systemd/system.slice --kubelet-cgroups=/systemd/system.slice \
+--eviction-hard=memory.available&lt;100Mi,nodefs.available&lt;10%,nodefs.inodesFree&lt;5%,imagefs.available&lt;10%,imagefs.inodesFree&lt;5% \
+--docker=unix:///var/run/docker.sock \
+--node-labels=kubernetes.io/role=master,node-role.kubernetes.io/master="</pre>
 </div>
 </div>
 </div>
@@ -1444,7 +1399,7 @@ KUBELET_ARGS="--pod-manifest-path=/etc/kubernetes/manifests \
 # default config should be adequate
 
 # Add your own!
-KUBE_PROXY_ARGS="--cluster-cidr=10.64.0.0/16 \
+KUBE_PROXY_ARGS="--cluster-cidr=100.64.0.0/16 \
 --masquerade-all=true \
 --kubeconfig=/var/lib/kube-proxy/kubeconfig \
 --proxy-mode=iptables"</pre>
@@ -1478,8 +1433,8 @@ sudo systemctl start kube-proxy</pre>
 </div>
 <div class="literalblock">
 <div class="content">
-<pre>Client Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.8", GitCommit:"c138b85178156011dc934c2c9f4837476876fb07", GitTreeState:"clean", BuildDate:"2018-05-21T19:01:12Z", GoVersion:"go1.9.3", Compiler:"gc", Platform:"linux/s390x"}
-Server Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.8", GitCommit:"c138b85178156011dc934c2c9f4837476876fb07", GitTreeState:"clean", BuildDate:"2018-05-21T18:53:18Z", GoVersion:"go1.9.3", Compiler:"gc", Platform:"linux/s390x"}</pre>
+<pre>Client Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.6", GitCommit:"9f8ebd171479bec0ada837d7ee641dec2f8c6dd1", GitTreeState:"clean", BuildDate:"2018-04-06T19:54:24Z", GoVersion:"go1.9.4", Compiler:"gc", Platform:"linux/s390x"}
+Server Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.6", GitCommit:"9f8ebd171479bec0ada837d7ee641dec2f8c6dd1", GitTreeState:"clean", BuildDate:"2018-04-06T19:54:24Z", GoVersion:"go1.9.4", Compiler:"gc", Platform:"linux/s390x"}</pre>
 </div>
 </div>
 </div>
@@ -1505,7 +1460,7 @@ etcd-0               Healthy   {"health":"true"}</pre>
 <div class="literalblock">
 <div class="content">
 <pre>NAME         STATUS    ROLES     AGE       VERSION
-k8s-worker   Ready     &lt;none&gt;    6d        v1.9.8</pre>
+148.100.10.16   Ready     &lt;none&gt;    6d        v1.9.6</pre>
 </div>
 </div>
 </div>
@@ -1520,7 +1475,7 @@ k8s-worker   Ready     &lt;none&gt;    6d        v1.9.8</pre>
 kubectl get pods -o wide
 kubectl expose deployment nginx --type NodePort
 NODE_PORT=$(kubectl get svc nginx --output=jsonpath='{range .spec.ports[0]}{.nodePort}')
-curl http://192.168.100.169:${NODE_PORT} #The IP is of Worker node</pre>
+curl http://148.100.10.16:${NODE_PORT} #The IP is of Worker node</pre>
 </div>
 </div>
 </div>
@@ -1573,7 +1528,7 @@ of the service using <code><code>journalctl -fu &lt;service name&gt;</code></cod
 <div id="footer">
 <div id="footer-text">
 Version 1.0<br>
-Last updated 2018-07-03 13:50:49 IST
+Last updated 2018-07-18 23:58:33 IST
 </div>
 </div>
 </body>
