@@ -437,15 +437,14 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div class="details">
 <span id="author" class="author">Rajula Vineet Reddy</span><br>
 <span id="email" class="email"><a href="mailto:rajula96reddy@gmail.com">rajula96reddy@gmail.com</a></span><br>
-<span id="revnumber">version 1.3,</span>
-<span id="revdate">2018-06-22</span>
+<span id="revnumber">version 1.0,</span>
+<span id="revdate">2018-07-21</span>
 </div>
 <div id="toc" class="toc2">
 <div id="toctitle">Table of Contents</div>
 <ul class="sectlevel1">
 <li><a href="#_versions_of_all_the_components_used">Versions of all the components used</a></li>
-<li><a href="#_kvm_setup">KVM Setup</a></li>
-<li><a href="#_setting_up_the_vms_before_installing_the_components">Setting up the VMs before installing the components</a></li>
+<li><a href="#_setting_up_the_nodes_before_installing_the_components">Setting up the Nodes before installing the components</a></li>
 <li><a href="#_installing_kubernetes_binaries_on_the_nodes">Installing Kubernetes binaries on the Nodes</a>
 <ul class="sectlevel2">
 <li><a href="#_method_1_using_tar_releases">Method 1 - Using tar releases</a></li>
@@ -460,8 +459,8 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 </li>
 <li><a href="#_setting_up_etcd">Setting up Etcd</a>
 <ul class="sectlevel2">
-<li><a href="#_building_the_binaries">Building the binaries</a></li>
-<li><a href="#_running_etcd_as_a_systemd_service">Running Etcd as a systemd service</a></li>
+<li><a href="#_installing_etcd">Installing Etcd</a></li>
+<li><a href="#_configuring_etcd">Configuring Etcd</a></li>
 <li><a href="#_test_etcd_cluster">Test etcd cluster</a></li>
 </ul>
 </li>
@@ -498,6 +497,10 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <p><strong>Note:</strong> This setup documents running a two node (1 Master &amp; 1 Worker) Kubernetes Cluster
 on LinuxOne cloud using LinuxOne supported linux distribution <strong>Canonical Ubuntu 18.04</strong>.</p>
 </div>
+<div class="paragraph">
+<p>Also please do note that, all the lines starting with <strong>#</strong> in the code blocks
+are comments and are not intended to be ran, although they are harmless when ran ;).</p>
+</div>
 </div>
 </div>
 <div class="sect1">
@@ -525,11 +528,7 @@ with <strong>flannel</strong> as the overlay networking model. The versions of e
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">LinuxOne Instance OS</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">SLES12SP3</p></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Ubuntu VMs</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">18.04</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Ubuntu 18.04</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Go</p></td>
@@ -541,7 +540,7 @@ with <strong>flannel</strong> as the overlay networking model. The versions of e
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Docker</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">18.06.0</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">17.12.1-ce</p></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Etcd</p></td>
@@ -558,28 +557,26 @@ with <strong>flannel</strong> as the overlay networking model. The versions of e
 </div>
 </div>
 <div class="sect1">
-<h2 id="_kvm_setup">KVM Setup</h2>
+<h2 id="_setting_up_the_nodes_before_installing_the_components">Setting up the Nodes before installing the components</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>Refer to this <a href="https://gist.github.com/rajula96reddy/a9065c75d0b7c1b9f5472e0d480f31eb">gist</a> to setup
-virtual machines using KVM on LinuxOne Community Cloud.</p>
+<p>This setup requires about 2 LinuxOne cloud instances. One for master and one for worker. Make sure you install Ubuntu on both the
+instances.
+SSH into the nodes and follow the below steps in the nodes specified across each step</p>
 </div>
-</div>
-</div>
-<div class="sect1">
-<h2 id="_setting_up_the_vms_before_installing_the_components">Setting up the VMs before installing the components</h2>
-<div class="sectionbody">
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p>Create two virtual machines after setting up KVM as explained above and install ubuntu on both the nodes</p>
-</li>
-<li>
-<p>Make sure to set the hostname of both the machines to differentiate one machine from the other. Preferably
-name the machines as <strong><em>k8s-master</em></strong> for the Master node and <strong><em>k8s-worker</em></strong> for the Worker node</p>
-</li>
-<li>
-<p>SSH into the nodes and follow the below steps in the nodes specified across each step</p>
+<p>Set the hostnames for each of the nodes using the utility <code>hostnamectl</code> as follows. Preferrably
+set the hostnames as <strong>k8s-master</strong> &amp; <strong>k8s-worker</strong> respectively.</p>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code># On Master Node
+hostnamectl set-hostname k8s-master
+# On Worker Node
+hostnamectl set-hostname k8s-worker</code></pre>
+</div>
+</div>
 </li>
 <li>
 <p>Note down the IP addresses of both the nodes. In the context of this document, IP addresses of the nodes
@@ -610,21 +607,10 @@ are as follows</p>
 </table>
 </li>
 <li>
-<p>Enable and create a root password on the worker node(s), to able to <em>scp</em> later</p>
+<p>Enable and create a root password on the worker node(s), to able to <em>scp</em> directly to the root directories later</p>
 <div class="literalblock">
 <div class="content">
 <pre>sudo passwd root</pre>
-</div>
-</div>
-</li>
-<li>
-<p>Install <strong>Go</strong> on the Master node. Go installation is needed to build <strong>etcd</strong> in the later stages</p>
-<div class="literalblock">
-<div class="content">
-<pre>wget https://dl.google.com/go/go1.10.2.linux-s390x.tar.gz
-tar -C /usr/local -xzf go1.10.2.linux-s390x.tar.gz
-echo 'export PATH=$PATH:/usr/local/go/bin' &gt;&gt; /etc/profile
-source /etc/profile</pre>
 </div>
 </div>
 </li>
@@ -642,10 +628,7 @@ working of <strong>flannel</strong>.</p>
 <p>Install docker on Worker node(s).</p>
 <div class="literalblock">
 <div class="content">
-<pre>cd ~/Downloads
-wget https://download.docker.com/linux/ubuntu/dists/bionic/pool/nightly/s390x/docker-ce_18.06.0~ce~dev~git20180604.170905.0.7841994-0~ubuntu_s390x.deb
-sudo apt-get install libltdl7 #docker dependency
-sudo dpkg -i docker-ce*
+<pre>sudo apt install docker.io
 sudo systemctl enable docker.service
 sudo systemctl start docker.service</pre>
 </div>
@@ -679,16 +662,16 @@ sudo mkdir /var/lib/flanneld/</pre>
 </div>
 </li>
 <li>
-<p>Kubernetes is not currently designed to work with swap memory on.
-Disable swap space on all the nodes, by running</p>
-</li>
-</ol>
-</div>
+<p>Kubernetes is doesn&#8217;t work as it is expected with swap memory on.
+Disable swap space on the <strong>worker</strong> node(s), by running</p>
 <div class="literalblock">
 <div class="content">
 <pre>swapoff -a
 sudo sed -i 's/\/swapfile/#\/swapfile/g' /etc/fstab</pre>
 </div>
+</div>
+</li>
+</ol>
 </div>
 </div>
 </div>
@@ -779,6 +762,7 @@ DNS.3 = kubernetes.default.svc
 DNS.4 = kubernetes.default.svc.cluster.local
 IP.1 = 127.0.0.1
 IP.2 = 192.168.100.218 # Master IP
+IP.3 = 100.65.0.1 # Service IP
 EOF</pre>
 </div>
 </div>
@@ -803,26 +787,6 @@ cp apiserver-key.pem server.key</pre>
 <pre>openssl genrsa -out admin-key.pem 2048
 openssl req -new -key admin-key.pem -out admin.csr -subj "/CN=admin"
 openssl x509 -req -in admin.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out admin.pem -days 7200</pre>
-</div>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_kube_proxy_certificates">Kube-proxy certificates</h4>
-<div class="literalblock">
-<div class="content">
-<pre>openssl genrsa -out kube-proxy-key.pem 2048
-openssl req -new -key kube-proxy-key.pem -out kube-proxy.csr -subj "/CN=kube-proxy"
-openssl x509 -req -in kube-proxy.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kube-proxy.pem -days 7200</pre>
-</div>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_kubelet_certificates">Kubelet certificates</h4>
-<div class="literalblock">
-<div class="content">
-<pre>openssl genrsa -out kubelet-key.pem 2048
-openssl req -new -key kubelet-key.pem -out kubelet.csr -subj "/CN=kubelet"
-openssl x509 -req -in kubelet.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kubelet.pem -days 7200</pre>
 </div>
 </div>
 </div>
@@ -866,14 +830,25 @@ EOF</pre>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_worker_certificates">Worker certificates</h4>
+<h4 id="_kubelet_certificates">Kubelet certificates</h4>
+<div class="paragraph">
+<p>Note: 'k8s-worker' here refers to the hostname of the worker</p>
+</div>
 <div class="literalblock">
 <div class="content">
-<pre>openssl genrsa -out ubuntu-worker-key.pem 2048
-WORKER_IP=192.168.100.225 openssl req -new -key ubuntu-worker-key.pem -out ubuntu-worker.csr \
-  -subj "/CN=ubuntu" -config worker-openssl.cnf
-WORKER_IP=192.168.100.225 openssl x509 -req -in ubuntu-worker.csr -CA ca.pem -CAkey ca-key.pem \
-  -CAcreateserial -out ubuntu-worker.pem -days 7200 -extensions v3_req -extfile worker-openssl.cnf</pre>
+<pre>openssl genrsa -out kubelet-key.pem 2048
+openssl req -new -key kubelet-key.pem -out kubelet.csr -subj "/CN=system:node:k8s-worker"
+openssl x509 -req -in kubelet.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kubelet.pem -days 7200 -extensions v3_req -extfile worker-openssl.cnf</pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_kube_proxy_certificates">Kube-proxy certificates</h4>
+<div class="literalblock">
+<div class="content">
+<pre>openssl genrsa -out kube-proxy-key.pem 2048
+openssl req -new -key kube-proxy-key.pem -out kube-proxy.csr -subj "/CN=kube-proxy"
+openssl x509 -req -in kube-proxy.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kube-proxy.pem -days 7200</pre>
 </div>
 </div>
 </div>
@@ -912,7 +887,7 @@ openssl x509 -req -sha256 -CA ca.pem -CAkey ca-key.pem -CAcreateserial \
 <h4 id="_copy_the_required_certificates_to_the_worker_node">Copy the required certificates to the Worker node</h4>
 <div class="literalblock">
 <div class="content">
-<pre>scp ca.pem etcd.crt etcd.key server.crt server.key root@192.168.100.225:/srv/kubernetes/</pre>
+<pre>scp ca.pem etcd.crt etcd.key kubelet.key kubelet-key.pem root@192.168.100.225:/srv/kubernetes/</pre>
 </div>
 </div>
 </div>
@@ -989,59 +964,88 @@ scp kube-proxy.kubeconfig root@192.168.100.225:/var/lib/kube-proxy/kubeconfig</p
 <h2 id="_setting_up_etcd">Setting up Etcd</h2>
 <div class="sectionbody">
 <div class="sect2">
-<h3 id="_building_the_binaries">Building the binaries</h3>
+<h3 id="_installing_etcd">Installing Etcd</h3>
 <div class="literalblock">
 <div class="content">
-<pre>cd /usr/local/bin/go/src/
-mkdir -p github.com/coreos
-cd github.com/coreos
-git clone git://github.com/coreos/etcd
-cd etcd
-git checkout v3.3.6
-./build
-./test #(optional)
-cp bin/* /usr/local/bin</pre>
+<pre>apt install -y etcd
+# Ignore the error. This is because etcd is running on an unsupported platform</pre>
 </div>
 </div>
 </div>
 <div class="sect2">
-<h3 id="_running_etcd_as_a_systemd_service">Running Etcd as a systemd service</h3>
+<h3 id="_configuring_etcd">Configuring Etcd</h3>
+<div class="paragraph">
+<p>Add the following lines the end of file <code>/etc/default/etcd</code></p>
+</div>
 <div class="literalblock">
 <div class="content">
-<pre>sudo cat &gt; /etc/systemd/system/etcd.service &lt;&lt; EOF
-[Unit]
-Description=etcd key-value store
-Documentation=https://github.com/coreos/etcd
-
-[Service]
-Environment="ETCD_UNSUPPORTED_ARCH=s390x"
-ExecStart=/usr/local/bin/etcd \\
- --name master \\
- --cert-file=/srv/kubernetes/etcd.crt \\
- --key-file=/srv/kubernetes/etcd.key \\
- --peer-cert-file=/srv/kubernetes/etcd.crt \\
- --peer-key-file=/srv/kubernetes/etcd.key \\
- --trusted-ca-file=/srv/kubernetes/ca.pem \\
- --peer-trusted-ca-file=/srv/kubernetes/ca.pem \\
- --peer-client-cert-auth \\
- --client-cert-auth \\
- --initial-advertise-peer-urls https://192.168.100.218:2380 \\
- --listen-peer-urls https://192.168.100.218:2380 \\
- --listen-client-urls https://192.168.100.218:2379,http://127.0.0.1:2379 \\
- --advertise-client-urls https://192.168.100.218:2379 \\
- --initial-cluster-token etcd-cluster-0 \\
- --initial-cluster master=https://192.168.100.218:2380 \\
- --initial-cluster-state new \\
- --data-dir=/var/lib/etcd \\
- --debug
-Restart=always
-RestartSec=10s
-LimitNOFILE=40000
-Type=notify
-EOF
-sudo systemctl enable etcd
-sudo systemctl start etcd
-sudo systemctl status etcd --no-pager</pre>
+<pre>ETCD_UNSUPPORTED_ARCH=s390x
+# [member]
+ETCD_NAME=master
+ETCD_DATA_DIR="/var/lib/etcd"
+#ETCD_WAL_DIR=""
+#ETCD_SNAPSHOT_COUNT="10000"
+#ETCD_HEARTBEAT_INTERVAL="100"
+#ETCD_ELECTION_TIMEOUT="1000"
+ETCD_LISTEN_PEER_URLS="https://192.168.100.218:2380"
+ETCD_LISTEN_CLIENT_URLS="https://192.168.100.218:2379"
+#ETCD_MAX_SNAPSHOTS="5"
+#ETCD_MAX_WALS="5"
+#ETCD_CORS=""
+#
+#[cluster]
+ETCD_INITIAL_ADVERTISE_PEER_URLS="https://192.168.100.218:2380"
+# if you use different ETCD_NAME (e.g. test), set ETCD_INITIAL_CLUSTER value for this name, i.e. "test=http://..."
+ETCD_INITIAL_CLUSTER="master=https://192.168.100.218:2380"
+ETCD_INITIAL_CLUSTER_STATE="new"
+ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster-0"
+ETCD_ADVERTISE_CLIENT_URLS="https://192.168.100.218:2379"
+#ETCD_DISCOVERY=""
+#ETCD_DISCOVERY_SRV=""
+#ETCD_DISCOVERY_FALLBACK="proxy"
+#ETCD_DISCOVERY_PROXY=""
+#
+#[proxy]
+#ETCD_PROXY="off"
+#ETCD_PROXY_FAILURE_WAIT="5000"
+#ETCD_PROXY_REFRESH_INTERVAL="30000"
+#ETCD_PROXY_DIAL_TIMEOUT="1000"
+#ETCD_PROXY_WRITE_TIMEOUT="5000"
+#ETCD_PROXY_READ_TIMEOUT="0"
+#
+#[security]
+ETCD_CERT_FILE="/srv/kubernetes/etcd.crt"
+ETCD_KEY_FILE="/srv/kubernetes/etcd.key"
+ETCD_CLIENT_CERT_AUTH="true"
+ETCD_TRUSTED_CA_FILE="/srv/kubernetes/ca.pem"
+ETCD_PEER_CERT_FILE="/srv/kubernetes/etcd.crt"
+ETCD_PEER_KEY_FILE="/srv/kubernetes/etcd.key"
+ETCD_PEER_CLIENT_CERT_AUTH="true"
+#ETCD_PEER_TRUSTED_CA_FILE=""
+#
+#[logging]
+ETCD_DEBUG="true"
+# examples for -log-package-levels etcdserver=WARNING,security=DEBUG
+ETCD_LOG_PACKAGE_LEVELS="DEBUG"</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now give the read permissions 'for others' for the 'etcd.key' file used in the above
+configurations, as the etcd systemd file runs as user 'etcd'. The other certs already
+have the required read permissions.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>chmod 604 /srv/kubernetes/etcd.key</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now run the etcd systemd service</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>systemctl restart etcd
+systemctl status etcd --no-pager</pre>
 </div>
 </div>
 </div>
@@ -1049,7 +1053,7 @@ sudo systemctl status etcd --no-pager</pre>
 <h3 id="_test_etcd_cluster">Test etcd cluster</h3>
 <div class="listingblock">
 <div class="content">
-<pre class="highlight"><code>etcdctl --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem cluster-health</code></pre>
+<pre class="highlight"><code>etcdctl --endpoints https://192.168.100.218:2379 --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem cluster-health</code></pre>
 </div>
 </div>
 <div class="paragraph">
@@ -1081,7 +1085,7 @@ sudo cp flanneld-s390x /usr/local/bin/flanneld</pre>
 </div>
 <div class="literalblock">
 <div class="content">
-<pre>etcdctl --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'</pre>
+<pre>etcdctl --endpoints https://192.168.100.218:2379 --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'</pre>
 </div>
 </div>
 </div>
@@ -1218,7 +1222,7 @@ ExecStart=/usr/local/bin/kube-apiserver \\
  --allow-privileged=true \\
  --anonymous-auth=false \\
  --apiserver-count=1 \\
- --authorization-mode=RBAC,AlwaysAllow \\
+ --authorization-mode=Node,RBAC,AlwaysAllow \\
  --authorization-rbac-super-user=admin \\
  --etcd-cafile=/srv/kubernetes/ca.pem \\
  --etcd-certfile=/srv/kubernetes/etcd.crt \\
@@ -1226,7 +1230,6 @@ ExecStart=/usr/local/bin/kube-apiserver \\
  --etcd-servers=https://192.168.100.218:2379 \\
  --enable-swagger-ui=true \\
  --event-ttl=1h \\
- --insecure-bind-address=0.0.0.0 \\
  --kubelet-certificate-authority=/srv/kubernetes/ca.pem \\
  --kubelet-client-certificate=/srv/kubernetes/kubelet.pem \\
  --kubelet-client-key=/srv/kubernetes/kubelet-key.pem \\
@@ -1336,7 +1339,7 @@ Requires=docker.service
 [Service]
 ExecStart=/usr/local/bin/kubelet \
   --allow-privileged=true \
-  --cluster-dns=10.0.64.0.10 \
+  --cluster-dns=100.65.0.10 \
   --cluster-domain=cluster.local \
   --container-runtime=docker \
   --kubeconfig=/var/lib/kubelet/kubeconfig \
@@ -1369,7 +1372,7 @@ Documentation=https://github.com/GoogleCloudPlatform/kubernetes
 
 [Service]
 ExecStart=/usr/local/bin/kube-proxy \
-  --cluster-cidr=10.64.0.0/16 \
+  --cluster-cidr=100.64.0.0/16 \
   --masquerade-all=true \
   --kubeconfig=/var/lib/kube-proxy/kubeconfig \
   --proxy-mode=iptables \
@@ -1493,8 +1496,8 @@ of the service using <code><code>journalctl -fu &lt;service name&gt;</code></cod
 </div>
 <div id="footer">
 <div id="footer-text">
-Version 1.3<br>
-Last updated 2018-06-22 19:16:23 IST
+Version 1.0<br>
+Last updated 2018-07-21 10:59:25 IST
 </div>
 </div>
 </body>
