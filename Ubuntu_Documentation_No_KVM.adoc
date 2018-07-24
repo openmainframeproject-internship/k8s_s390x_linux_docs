@@ -1,6 +1,6 @@
 = Installing Kubernetes on LinuxOne - Canonical Distribution
 Rajula Vineet Reddy <rajula96reddy@gmail.com>
-v1.0, 2018-07-21
+v2.0, 2018-07-24
 :toc: left
 
 *Note:* This setup documents running a two node (1 Master & 1 Worker) Kubernetes Cluster
@@ -35,9 +35,9 @@ set the hostnames as *k8s-master* & *k8s-worker* respectively.
 +
 ```
 # On Master Node
-hostnamectl set-hostname k8s-master
+sudo hostnamectl set-hostname k8s-master
 # On Worker Node
-hostnamectl set-hostname k8s-worker
+sudo hostnamectl set-hostname k8s-worker
 ```
 2. Note down the IP addresses of both the nodes. In the context of this document, IP addresses of the nodes
 are as follows
@@ -100,7 +100,7 @@ sudo sed -i 's/\/swapfile/#\/swapfile/g' /etc/fstab
 ### Method 1 - Using tar releases
 It is important to set the *KUBERNETES_SERVER_ARCH* to *s390x* in this step. Run the following on the Master node
 ....
-cd ~/Downloads
+cd ~/
 wget https://dl.k8s.io/v1.9.8/kubernetes.tar.gz
 tar -xvf kubernetes.tar.gz
 cd kubernetes/cluster
@@ -115,7 +115,7 @@ sudo scp server/kubernetes/server/bin/{kubelet,kube-proxy} root@192.168.100.225:
 The binaries can also be directly downloaded from the official googleapi links. Run the following
 commands on the Master node
 ....
-cd ~/Downloads
+cd ~/
 wget https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/s390x/kubectl
 wget https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/s390x/kube-apiserver
 wget https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/s390x/kube-controller-manager
@@ -366,7 +366,7 @@ Flannel should be installed on all the nodes
 
 ### Installing Flannel
 ....
-cd ~/Downloads
+cd ~/
 wget https://github.com/coreos/flannel/releases/download/v0.10.0/flanneld-s390x
 chmod +x flanneld-s390x
 sudo cp flanneld-s390x /usr/local/bin/flanneld

@@ -35,9 +35,9 @@ set the hostnames as *k8s-master* & *k8s-worker* respectively.
 +
 ```
 # On Master Node
-hostnamectl set-hostname k8s-master
+sudo hostnamectl set-hostname k8s-master
 # On Worker Node
-hostnamectl set-hostname k8s-worker
+sudo hostnamectl set-hostname k8s-worker
 ```
 2. Note down the IP addresses of both the nodes. In the context of this document, IP addresses of the nodes
 are as follows
@@ -354,7 +354,7 @@ Flannel should be installed on all the nodes
 
 ### Installing Flannel
 ....
-cd ~/Downloads
+cd ~/
 wget https://github.com/coreos/flannel/releases/download/v0.10.0/flanneld-s390x
 chmod +x flanneld-s390x
 sudo cp flanneld-s390x /usr/local/bin/flanneld
@@ -457,7 +457,7 @@ the IP of the nodes on the flannel networks can be seen by running ```ip a``` on
 Set the following parameters for Kube-apiserver using the *snap set* command
 ....
 snap set kube-apiserver bind-address=0.0.0.0 \
-advertise-address=148.100.98.235 \
+advertise-address=192.168.100.218 \
 admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota \
 allow-privileged=true \
 anonymous-auth=false \
@@ -467,7 +467,7 @@ authorization-rbac-super-user=admin \
 etcd-cafile=/srv/kubernetes/ca.pem \
 etcd-certfile=/srv/kubernetes/etcd.crt \
 etcd-keyfile=/srv/kubernetes/etcd.key \
-etcd-servers=https://148.100.98.235:2379 \
+etcd-servers=https://192.168.100.218:2379 \
 enable-swagger-ui=true event-ttl=1h \
 kubelet-certificate-authority=/srv/kubernetes/ca.pem \
 kubelet-client-certificate=/srv/kubernetes/kubelet.pem \
@@ -489,7 +489,7 @@ Set the following parameters for Kube-scheduler using the *snap set* command
 ....
 snap set kube-scheduler leader-elect=true \
 kubeconfig=/var/lib/kube-scheduler/kubeconfig \
-master=https://148.100.98.235:6443 \
+master=https://192.168.100.218:6443 \
 v=2
 ....
 #### Kube-controller-manager configuration
@@ -509,7 +509,7 @@ cluster-signing-cert-file=/root/srv/kubernetes/ca.pem \
 cluster-signing-key-file=/root/srv/kubernetes/ca-key.pem \
 service-cluster-ip-range=100.65.0.0/24 \
 configure-cloud-routes=false \
-master=https://148.100.98.235:6443 \
+master=https://192.168.100.218:6443 \
 allow-privileged=true
 ....
 ### Worker Components
@@ -517,7 +517,7 @@ allow-privileged=true
 Set the following parameters for Kubelet using the *snap set* command
 ....
 snap set kubelet kubeconfig=/root/srv/kubernetes/kubelet.kubeconfig \
-address=148.100.99.136 \
+address=192.168.100.225 \
 allow-privileged \
 tls-cert-file=/root/srv/kubernetes/kubelet.pem \
 tls-private-key-file=/root/srv/kubernetes/kubelet-key.pem \
@@ -532,7 +532,7 @@ kubelet-cgroups=/systemd/system.slice \
 docker=unix:///var/run/docker.sock \
 node-labels=kubernetes.io/role=master,node-role.kubernetes.io/master= \
 v=2 \
-hostname-override=148.100.98.235 \
+hostname-override=192.168.100.218 \
 port=10250 \
 logtostderr \
 pod-manifest-path=/root/srv/kubernetes/manifests
@@ -553,8 +553,8 @@ Now that we have deployed the cluster let's test it.
 ### Test if Kuberenetes Api Server is Running
 Running ```kubectl version``` should return the version of both kubectl and kube-api-server
 ....
-Client Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.8", GitCommit:"c138b85178156011dc934c2c9f4837476876fb07", GitTreeState:"clean", BuildDate:"2018-05-21T19:01:12Z", GoVersion:"go1.9.3", Compiler:"gc", Platform:"linux/s390x"}
-Server Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.8", GitCommit:"c138b85178156011dc934c2c9f4837476876fb07", GitTreeState:"clean", BuildDate:"2018-05-21T18:53:18Z", GoVersion:"go1.9.3", Compiler:"gc", Platform:"linux/s390x"}
+Client Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.9", GitCommit:"57729ea3d9a1b75f3fc7bbbadc597ba707d47c8a", GitTreeState:"clean", BuildDate:"2018-06-29T01:14:35Z", GoVersion:"go1.9.3", Compiler:"gc", Platform:"linux/s390x"}
+Server Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.9", GitCommit:"57729ea3d9a1b75f3fc7bbbadc597ba707d47c8a", GitTreeState:"clean", BuildDate:"2018-06-29T01:07:01Z", GoVersion:"go1.9.3", Compiler:"gc", Platform:"linux/s390x"}
 ....
 ### Test if all the components are healthy
 Running ```kubectl get componentstatus``` should return the status of all the components
@@ -567,8 +567,8 @@ etcd-0               Healthy   {"health":"true"}
 ### Test if the node is registered
 Running ```kubectl get nodes``` should return the nodes sucessfully registered with the server and status of each node.
 ....
-NAME         STATUS    ROLES     AGE       VERSION
-k8s-worker   Ready     <none>    6d        v1.9.8
+NAME             STATUS    ROLES     AGE       VERSION
+148.100.98.235   Ready     master    5h        v1.9.8
 ....
 ### Deploy ngninx
 Let's run an Ngnix app on the cluster.

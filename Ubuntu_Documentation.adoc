@@ -68,7 +68,7 @@ sudo apt-get -y install vim git net-tools
 8. Install docker on Worker node(s).
 +
 ....
-cd ~/Downloads
+cd ~/
 wget https://download.docker.com/linux/ubuntu/dists/bionic/pool/nightly/s390x/docker-ce_18.06.0~ce~dev~git20180604.170905.0.7841994-0~ubuntu_s390x.deb
 sudo apt-get install libltdl7 #docker dependency
 sudo dpkg -i docker-ce*
@@ -102,7 +102,7 @@ sudo sed -i 's/\/swapfile/#\/swapfile/g' /etc/fstab
 ### Method 1 - Using tar releases
 It is important to set the *KUBERNETES_SERVER_ARCH* to *s390x* in this step. Run the following on the Master node
 ....
-cd ~/Downloads
+cd ~/
 wget https://dl.k8s.io/v1.9.8/kubernetes.tar.gz
 tar -xvf kubernetes.tar.gz
 cd kubernetes/cluster
@@ -117,7 +117,7 @@ sudo scp server/kubernetes/server/bin/{kubelet,kube-proxy} root@192.168.100.225:
 The binaries can also be directly downloaded from the official googleapi links. Run the following
 commands on the Master node
 ....
-cd ~/Downloads
+cd ~/
 wget https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/s390x/kubectl
 wget https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/s390x/kube-apiserver
 wget https://storage.googleapis.com/kubernetes-release/release/v1.9.8/bin/linux/s390x/kube-controller-manager
@@ -355,7 +355,7 @@ Flannel should be installed on all the nodes
 
 ### Installing Flannel
 ....
-cd ~/Downloads
+cd ~/
 wget https://github.com/coreos/flannel/releases/download/v0.10.0/flanneld-s390x
 chmod +x flanneld-s390x
 sudo cp flanneld-s390x /usr/local/bin/flanneld
