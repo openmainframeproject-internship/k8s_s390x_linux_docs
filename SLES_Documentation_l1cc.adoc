@@ -1,6 +1,6 @@
 = Installing Kubernetes on LinuxOne - SUSE Linux Enterprise Server Distribution
 Rajula Vineet Reddy <rajula96reddy@gmail.com>
-v1.0, 2018-07-18
+v1.0, 2018-07-26
 :toc: left
 
 *Note:* This setup documents running a two node (1 Master & 1 Worker) Kubernetes Cluster
