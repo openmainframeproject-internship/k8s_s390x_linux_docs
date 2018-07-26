@@ -329,7 +329,8 @@ ETCD_DATA_DIR="/var/lib/etcd"
 #ETCD_HEARTBEAT_INTERVAL="100"
 #ETCD_ELECTION_TIMEOUT="1000"
 ETCD_LISTEN_PEER_URLS="https://192.168.100.230:2380"
-ETCD_LISTEN_CLIENT_URLS="https://192.168.100.230:2379,http://127.0.0.1:2379"
+# The value "http://127.0.0.1:2379" can also be used for ETCD_LISTEN_CLIENT_URLS, but it is not secure
+ETCD_LISTEN_CLIENT_URLS="https://192.168.100.230:2379"
 #ETCD_MAX_SNAPSHOTS="5"
 #ETCD_MAX_WALS="5"
 #ETCD_CORS=""
@@ -393,7 +394,7 @@ rpm -U flannel-0.9.1-5.2.s390x.rpm
 #### Adding an entry to etcd
 This should be run only once and only on the Master node
 ....
-etcdctl --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'
+etcdctl --endpoints https://192.168.100.230:2379 --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'
 ....
 ### Configure Flannel Settings
 Initialize the variables required for flanneld in the configuration

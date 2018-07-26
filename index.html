@@ -589,20 +589,26 @@ are as follows</p>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Master</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><span class="red">148.100.10.15</span></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><span class="red">148.100.99.208</span></p></td>
 </tr>
 </tbody>
 <tfoot>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Worker</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><span class="red">148.100.10.16</span></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><span class="red">148.100.99.206</span></p></td>
 </tr>
 </tfoot>
 </table>
 </li>
 <li>
-<p>Make sure the firewall is disabled on both the nodes, if not disable it
-by running <code><code>SuSEfirewall2 off</code></code></p>
+<p>Enable IP forward settings on all the worker node(s) so that, the containers are able to ping the internet using the following commands</p>
+<div class="literalblock">
+<div class="content">
+<pre>sysctl -w net.ipv4.ip_forward=1
+sysctl -w net.ipv4.conf.all.forwarding=1
+sysctl -w net.bridge.bridge-nf-call-iptables=1</pre>
+</div>
+</div>
 </li>
 <li>
 <p>Check if docker is installed and the daemon is running on both the nodes
@@ -646,23 +652,30 @@ sudo mkdir /var/lib/flanneld/</pre>
 Disable swap space on the <strong>worker</strong> node(s), by running</p>
 <div class="literalblock">
 <div class="content">
-<pre>swapoff -a
+<pre>sudo swapoff -a
 sudo sed -i 's/.*swap/#&amp;/' /etc/fstab</pre>
 </div>
 </div>
 </li>
 <li>
-<p>Copy the worker node ssh keys on to the master node using scp from the system you are
-logging in from. The command should be on the lines of</p>
-<div class="listingblock">
+<p>Copy the contents of SSH public key of the Master node in the <code>authorized_keys</code>
+file on all the worker node(s). By doing this, we can <em>scp</em> files into the worker
+node(s) from the master node without having to authenticate.</p>
+<div class="literalblock">
 <div class="content">
-<pre class="highlight"><code>scp -i &lt;master_node&gt;.pem &lt;worker_node&gt;.pem linux1@148.100.10.15:/home/linux1/</code></pre>
+<pre># On the master node, check if you already have the file 'id_rsa.pub' in '.ssh/'. If not generate the key using the following steps
+ssh-keygen
+# Give default settings by pressing enter
+cat .ssh/id_rsa.pub
+#Copy the contents from the output of the above command
+# On the worker node(s) paste the copied contents at the end in the file '.ssh/authorized_keys'
+echo "&lt;key_copied&gt;" &gt;&gt; .ssh/authorized_keys</pre>
 </div>
 </div>
-<div class="paragraph">
-<p>Here <strong>&lt;master_node&gt;.pem</strong> refers to the master node ssh key and <strong>&lt;worker_node&gt;.pem</strong> refers to
-the worker node ssh key, Do change it accordingly.</p>
-</div>
+</li>
+<li>
+<p>It is recommended to login as root, as we will be dealing with files and tools which require
+root permissions. You can login as root from another account using <code>sudo -i</code>.</p>
 </li>
 </ol>
 </div>
@@ -679,10 +692,10 @@ Run the following commands on the nodes specified.</p>
 <h3 id="_components_on_master_node">Components on Master node</h3>
 <div class="literalblock">
 <div class="content">
-<pre>zypper ar -fc https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/ kubernetes
-zypper refresh
+<pre>sudo zypper ar -fc https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/ kubernetes
+sudo zypper refresh
 # choose trust always <strong>'a'</strong>
-zypper in etcd etcdctl kubernetes-master kubernetes-client flannel</pre>
+sudo zypper in etcd etcdctl kubernetes-master kubernetes-client flannel</pre>
 </div>
 </div>
 </div>
@@ -690,10 +703,10 @@ zypper in etcd etcdctl kubernetes-master kubernetes-client flannel</pre>
 <h3 id="_components_on_worker_nodes">Components on Worker node(s)</h3>
 <div class="literalblock">
 <div class="content">
-<pre>zypper ar -fc https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/ kubernetes
-zypper refresh
+<pre>sudo zypper ar -fc https://download.opensuse.org/repositories/home:/mfriesenegger:/branches:/devel:/CaaSP:/Head:/ControllerNode/SLE_12_SP3/ kubernetes
+sudo zypper refresh
 # choose trust always <strong>'a'</strong>
-zypper in kubernetes-node flannel</pre>
+sudo zypper in kubernetes-node flannel</pre>
 </div>
 </div>
 </div>
@@ -713,6 +726,7 @@ specific mentioned certs and config files to the worker nodes.</p>
 <div class="literalblock">
 <div class="content">
 <pre>cd /srv/kubernetes
+sudo -i
 openssl genrsa -out ca-key.pem 2048
 openssl req -x509 -new -nodes -key ca-key.pem -days 10000 -out ca.pem -subj "/CN=kube-ca"</pre>
 </div>
@@ -740,7 +754,7 @@ DNS.2 = kubernetes.default
 DNS.3 = kubernetes.default.svc
 DNS.4 = kubernetes.default.svc.cluster.local
 IP.1 = 127.0.0.1
-IP.2 = 148.100.10.15 # Master IP
+IP.2 = 148.100.99.208 # Master IP
 IP.3 = 100.65.0.1 #Service IP
 EOF</pre>
 </div>
@@ -801,7 +815,7 @@ basicConstraints = CA:FALSE
 keyUsage = nonRepudiation, digitalSignature, keyEncipherment
 subjectAltName = @alt_names
 [alt_names]
-IP.1 = 148.100.10.16
+IP.1 = 148.100.99.206
 EOF</pre>
 </div>
 </div>
@@ -844,7 +858,7 @@ keyUsage = nonRepudiation, digitalSignature, keyEncipherment
 extendedKeyUsage = clientAuth,serverAuth
 subjectAltName = @alt_names
 [alt_names]
-IP.1 = 148.100.10.15
+IP.1 = 148.100.99.208
 EOF</pre>
 </div>
 </div>
@@ -865,10 +879,7 @@ openssl x509 -req -sha256 -CA ca.pem -CAkey ca-key.pem -CAcreateserial \
 <div class="literalblock">
 <div class="content">
 <pre># Run the below step on the Master node
-scp -i &lt;path to worker.pem&gt; ca.pem etcd.crt etcd.key kubelet.key kubelet-key.pem linux1@148.100.10.16:/home/linux1/
-# Run the below step on the Worker node
-sudo cp /home/linux1/{*.pem,*.crt,*.key} /srv/kubernetes/
-# This is required because, the permissions associated with li1cc key doesn't allow us to directly copy to root folders</pre>
+scp ca.pem etcd.crt etcd.key kubelet.pem kubelet-key.pem root@148.100.99.206:/srv/kubernetes/</pre>
 </div>
 </div>
 </div>
@@ -880,7 +891,7 @@ sudo cp /home/linux1/{*.pem,*.crt,*.key} /srv/kubernetes/
 <div class="literalblock">
 <div class="content">
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.10.15:6443
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.99.208:6443
 kubectl config set-credentials admin --client-certificate=/srv/kubernetes/admin.pem --client-key=/srv/kubernetes/admin-key.pem --embed-certs=true --token=$TOKEN
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=admin
 kubectl config use-context linux1.k8s
@@ -893,7 +904,7 @@ cat ~/.kube/config #Create config file</pre>
 <div class="literalblock">
 <div class="content">
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.10.15:6443 --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.99.208:6443 --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
 kubectl config set-credentials kube-controller-manager --client-certificate=/srv/kubernetes/kube-controller-manager.pem --client-key=/srv/kubernetes/kube-controller-manager-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-controller-manager --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
 kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-controller-manager/kubeconfig</pre>
@@ -905,7 +916,7 @@ kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-controller-mana
 <div class="literalblock">
 <div class="content">
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.10.15:6443 --kubeconfig=/var/lib/kube-scheduler/kubeconfig
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.99.208:6443 --kubeconfig=/var/lib/kube-scheduler/kubeconfig
 kubectl config set-credentials kube-scheduler --client-certificate=/srv/kubernetes/kube-scheduler.pem --client-key=/srv/kubernetes/kube-scheduler-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/var/lib/kube-scheduler/kubeconfig
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-scheduler --kubeconfig=/var/lib/kube-scheduler/kubeconfig
 kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-scheduler/kubeconfig</pre>
@@ -917,7 +928,7 @@ kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-scheduler/kubec
 <div class="literalblock">
 <div class="content">
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.10.15:6443 --kubeconfig=kubelet.kubeconfig
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.99.208:6443 --kubeconfig=kubelet.kubeconfig
 kubectl config set-credentials kubelet --client-certificate=/srv/kubernetes/kubelet.pem --client-key=/srv/kubernetes/kubelet-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=kubelet.kubeconfig
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kubelet --kubeconfig=kubelet.kubeconfig
 kubectl config use-context linux1.k8s --kubeconfig=kubelet.kubeconfig</pre>
@@ -929,11 +940,10 @@ kubectl config use-context linux1.k8s --kubeconfig=kubelet.kubeconfig</pre>
 <div class="literalblock">
 <div class="content">
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.10.15:6443 --kubeconfig=kube-proxy.kubeconfig
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.99.208:6443 --kubeconfig=kube-proxy.kubeconfig
 kubectl config set-credentials kube-proxy --client-certificate=/srv/kubernetes/kube-proxy.pem --client-key=/srv/kubernetes/kube-proxy-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=kube-proxy.kubeconfig
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-proxy --kubeconfig=kube-proxy.kubeconfig
-kubectl config use-context linux1.k8s --kubeconfig=kube-proxy.kubeconfig
-scp kube-proxy.kubeconfig root@148.100.10.16:/var/lib/kube-proxy/kubeconfig</pre>
+kubectl config use-context linux1.k8s --kubeconfig=kube-proxy.kubeconfig</pre>
 </div>
 </div>
 </div>
@@ -945,11 +955,8 @@ scp kube-proxy.kubeconfig root@148.100.10.16:/var/lib/kube-proxy/kubeconfig</pre
 <div class="literalblock">
 <div class="content">
 <pre># Run the below command on the master node
-scp -i &lt;worker.pem&gt; kubelet.kubeconfig kube-proxy.kubeconfig linux1@148.100.10.16:/home/linux1/
-# &lt;worker.pem&gt; here refers to the worker node key
-# Run the below commands on the worker node
-sudo cp /home/linux1/kubelet.kubeconfig /var/lib/kubelet/kubeconfig
-sudo cp /home/linux1/kube-proxy.kubeconfig /var/lib/kube-proxy/kubeconfig</pre>
+scp kubelet.kubeconfig root@148.100.99.206:/var/lib/kubelet/kubeconfig
+scp kube-proxy.kubeconfig root@148.100.99.206:/var/lib/kube-proxy/kubeconfig</pre>
 </div>
 </div>
 </div>
@@ -1014,24 +1021,24 @@ as shown below</p>
 <div class="content">
 <pre># [member]
 ETCD_NAME=master
-ETCD_DATA_DIR="/var/lib/etcd"
+ETCD_DATA_DIR="/data/etcd"
 #ETCD_WAL_DIR=""
 #ETCD_SNAPSHOT_COUNT="10000"
 #ETCD_HEARTBEAT_INTERVAL="100"
 #ETCD_ELECTION_TIMEOUT="1000"
-ETCD_LISTEN_PEER_URLS="https://148.100.10.15:2380"
-ETCD_LISTEN_CLIENT_URLS="https://148.100.10.15:2379"
+ETCD_LISTEN_PEER_URLS="https://148.100.99.208:2380"
+ETCD_LISTEN_CLIENT_URLS="https://148.100.99.208:2379"
 #ETCD_MAX_SNAPSHOTS="5"
 #ETCD_MAX_WALS="5"
 #ETCD_CORS=""
 #
 #[cluster]
-ETCD_INITIAL_ADVERTISE_PEER_URLS="https://148.100.10.15:2380"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="https://148.100.99.208:2380"
 # if you use different ETCD_NAME (e.g. test), set ETCD_INITIAL_CLUSTER value for this name, i.e. "test=http://..."
-ETCD_INITIAL_CLUSTER="master=https://148.100.10.15:2380"
+ETCD_INITIAL_CLUSTER="master=https://148.100.99.208:2380"
 ETCD_INITIAL_CLUSTER_STATE="new"
 ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster-0"
-ETCD_ADVERTISE_CLIENT_URLS="https://148.100.10.15:2379"
+ETCD_ADVERTISE_CLIENT_URLS="https://148.100.99.208:2379"
 #ETCD_DISCOVERY=""
 #ETCD_DISCOVERY_SRV=""
 #ETCD_DISCOVERY_FALLBACK="proxy"
@@ -1062,6 +1069,32 @@ ETCD_LOG_PACKAGE_LEVELS="DEBUG"</pre>
 </div>
 </div>
 <div class="paragraph">
+<p>The default value of <strong>ETCD_DATA_DIR</strong> is <strong>/var/lib/etcd</strong>, there is high
+chance of running out of space. In that we need to change the <strong>ETCD_DATA_DIR</strong>
+variable in <code>/var/sysconfig/etcd</code> file and also the new folder need to be
+given appropriate permissions for the <strong>etcd</strong> user (as the systemd file is running as etcd user)
+using the command <code>chown -R etcd:etcd &lt;new_folder_path</code>&gt;.
+In the above config I have assigned <code>/data/etcd</code> as the data directory. So I need to create
+the directory and give owner permissions to <strong>etcd</strong> user</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>mkdir -p /data/etcd
+chown -R etcd:etcd /data/etcd</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Now, we need to flush the IP tables in order for Etcd to run without issues. It can be done by running the following command</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>iptables -F</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>However, when we setup flannel in the next step, it will add more iptable rules required.</p>
+</div>
+<div class="paragraph">
 <p>Now, run the following commands to start <strong>etcd</strong></p>
 </div>
 <div class="literalblock">
@@ -1071,19 +1104,12 @@ sudo systemctl enable etcd
 sudo systemctl start etcd</pre>
 </div>
 </div>
-<div class="paragraph">
-<p>At times, as the <strong>ETCD_DATA_DIR</strong> is given as <strong>/var/lib/etcd</strong> there is high
-chance of running out of space, in that we need to change the <strong>ETCD_DATA_DIR</strong>
-variable in <code>/var/sysconfig/etcd</code> file and also the new folder need to be
-given appropriate permissions for the <strong>etcd</strong> user (as the systemd file is running as etcd user)
-using the command <code>chown -R etcd:etcd &lt;new_folder_path</code>&gt;</p>
-</div>
 </div>
 <div class="sect2">
 <h3 id="_test_etcd_cluster">Test etcd cluster</h3>
 <div class="listingblock">
 <div class="content">
-<pre class="highlight"><code>etcdctl --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem cluster-health</code></pre>
+<pre class="highlight"><code>etcdctl --endpoints https://148.100.99.208:2379 --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem cluster-health</code></pre>
 </div>
 </div>
 <div class="paragraph">
@@ -1121,7 +1147,7 @@ file <code>/etc/sysconfig/flanneld</code> as shown below</p>
 <pre># Flanneld configuration options
 
 # etcd url location.  Point this to the server where etcd runs
-FLANNEL_ETCD_ENDPOINTS="https://148.100.10.15:2379"
+FLANNEL_ETCD_ENDPOINTS="https://148.100.99.208:2379"
 # ETCD Prefix for the -etcd-prefix argument
 FLANNEL_ETCD_KEY="/coreos.com/network"
 # Any additional options that you want to pass
@@ -1209,7 +1235,7 @@ KUBE_LOG_LEVEL="--v=5"
 KUBE_ALLOW_PRIV="--allow-privileged=true"
 
 # How the controller-manager, and proxy find the apiserver
-KUBE_MASTER="--master=https://148.100.10.15:6443"</pre>
+KUBE_MASTER="--master=https://148.100.99.208:6443"</pre>
 </div>
 </div>
 </div>
@@ -1233,7 +1259,7 @@ KUBE_API_ADDRESS=""
 # KUBELET_PORT="--kubelet-port=10250"
 
 # Comma separated list of nodes in the etcd cluster
-KUBE_ETCD_SERVERS="--etcd-servers=https://148.100.10.15:2379"
+# KUBE_ETCD_SERVERS="--etcd-servers=https://148.100.99.208:2379"
 
 # Address range to use for services
 KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=100.65.0.0/24"
@@ -1243,14 +1269,15 @@ KUBE_ADMISSION_CONTROL="--admission-control=NamespaceLifecycle,LimitRanger,Servi
 
 # Add your own!
 KUBE_API_ARGS="--bind-address=0.0.0.0 \
---advertise-address=148.100.10.15 \
+--advertise-address=148.100.99.208 \
 --anonymous-auth=false \
 --apiserver-count=1 \
 --authorization-mode=Node,AlwaysAllow,RBAC \
+--authorization-rbac-super-user=admin \
 --etcd-cafile=/srv/kubernetes/ca.pem \
 --etcd-certfile=/srv/kubernetes/etcd.crt \
 --etcd-keyfile=/srv/kubernetes/etcd.key \
---etcd-servers=https://148.100.10.15:2379 \
+--etcd-servers=https://148.100.99.208:2379 \
 --enable-swagger-ui=false \
 --event-ttl=1h \
 --kubelet-certificate-authority=/srv/kubernetes/ca.pem \
@@ -1350,7 +1377,7 @@ KUBE_LOG_LEVEL="--v=2"
 KUBE_ALLOW_PRIV="--allow-privileged=true"
 
 # How the controller-manager, and proxy find the apiserver
-KUBE_MASTER="--master=https://148.100.10.15:6443"</pre>
+KUBE_MASTER="--master=https://148.100.99.208:6443"</pre>
 </div>
 </div>
 </div>
@@ -1362,14 +1389,14 @@ KUBE_MASTER="--master=https://148.100.10.15:6443"</pre>
 # kubernetes kubelet (minion) config
 
 # The address for the info server to serve on (set to 0.0.0.0 or "" for all interfaces)
-KUBELET_ADDRESS="--address=148.100.10.16"
+KUBELET_ADDRESS="--address=148.100.99.206"
 
 # The port for the info server to serve on
 # KUBELET_PORT="--port=10250"
 
 # You may leave this blank to use the actual hostname
 #KUBELET_HOSTNAME="--hostname-override=127.0.0.1"
-KUBELET_HOSTNAME="--hostname-override=148.100.10.16"
+KUBELET_HOSTNAME="--hostname-override=148.100.99.206"
 
 # Add your own!
 KUBELET_ARGS="--pod-manifest-path=/etc/kubernetes/manifests \
@@ -1460,7 +1487,7 @@ etcd-0               Healthy   {"health":"true"}</pre>
 <div class="literalblock">
 <div class="content">
 <pre>NAME         STATUS    ROLES     AGE       VERSION
-148.100.10.16   Ready     &lt;none&gt;    6d        v1.9.6</pre>
+148.100.99.206   Ready     &lt;none&gt;    6d        v1.9.6</pre>
 </div>
 </div>
 </div>
@@ -1475,7 +1502,7 @@ etcd-0               Healthy   {"health":"true"}</pre>
 kubectl get pods -o wide
 kubectl expose deployment nginx --type NodePort
 NODE_PORT=$(kubectl get svc nginx --output=jsonpath='{range .spec.ports[0]}{.nodePort}')
-curl http://148.100.10.16:${NODE_PORT} #The IP is of Worker node</pre>
+curl http://148.100.99.206:${NODE_PORT} #The IP is of Worker node</pre>
 </div>
 </div>
 </div>
@@ -1528,7 +1555,7 @@ of the service using <code><code>journalctl -fu &lt;service name&gt;</code></cod
 <div id="footer">
 <div id="footer-text">
 Version 1.0<br>
-Last updated 2018-07-18 23:58:33 IST
+Last updated 2018-07-27 01:24:52 IST
 </div>
 </div>
 </body>
