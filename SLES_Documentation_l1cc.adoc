@@ -1,6 +1,6 @@
 = Installing Kubernetes on LinuxOne - SUSE Linux Enterprise Server Distribution
 Rajula Vineet Reddy <rajula96reddy@gmail.com>
-v1.0, 2018-07-26
+v2.0, 2018-07-31
 :toc: left
 
 *Note:* This setup documents running a two node (1 Master & 1 Worker) Kubernetes Cluster
@@ -47,23 +47,24 @@ are as follows
 | Worker | [red]#148.100.10.16#
 |====
 +
-3. Enable IP forward settings on all the worker node(s) so that, the containers are able to ping the internet using the following commands
+3. It is recommended to login as root on all the nodes, as we will be dealing with files and tools which require
+root permissions. You can login as root from another account using `sudo -i`. If not, use *sudo*
+before a command wherever required. Anyways, just to be safe I will include sudo where required.
+4. Enable IP forward settings on all the worker node(s) so that, the containers are able to ping the internet using the following commands
 +
 ....
 sysctl -w net.ipv4.ip_forward=1
 sysctl -w net.ipv4.conf.all.forwarding=1
 sysctl -w net.bridge.bridge-nf-call-iptables=1
 ....
-
-4. Check if docker is installed and the daemon is running on both the nodes
+5. Check if docker is installed and the daemon is running on both the nodes
  by running the following commands.
 +
 ....
 sudo systemctl status docker
 docker version
 ....
-+
-5. Create the below folders in order to save certificates & configuration files later
+6. Create the below folders in order to save certificates & configuration files later
 - On Master Node
 +
 ....
@@ -79,14 +80,14 @@ sudo mkdir -p /srv/kubernetes
 sudo mkdir -p /var/lib/{kube-proxy,kubelet}
 sudo mkdir /var/lib/flanneld/
 ....
-6. It is recommended to run Kubernetes without using swap memory.
+7. It is recommended to run Kubernetes without using swap memory.
 Disable swap space on the *worker* node(s), by running
 +
 ....
 sudo swapoff -a
 sudo sed -i 's/.*swap/#&/' /etc/fstab
 ....
-7. Copy the contents of SSH public key of the Master node in the `authorized_keys`
+8. Copy the contents of SSH public key of the Master node in the `authorized_keys`
 file on all the worker node(s). By doing this, we can _scp_ files into the worker
 node(s) from the master node without having to authenticate.
 +
@@ -99,7 +100,7 @@ cat .ssh/id_rsa.pub
 # On the worker node(s) paste the copied contents at the end in the file '.ssh/authorized_keys'
 echo "<key_copied>" >> .ssh/authorized_keys
 ....
-8. It is recommended to login as root on all the nodes, as we will be dealing with files and tools which require
+9. It is recommended to login as root on all the nodes, as we will be dealing with files and tools which require
 root permissions. You can login as root from another account using `sudo -i`. If not, use *sudo*
 before a command wherever required. Anyways, just to be safe I will include sudo where required.
 //7. Copy the worker node ssh keys on to the master node using scp from the system you are
@@ -133,8 +134,10 @@ sudo zypper refresh
 sudo zypper in kubernetes-node flannel
 ....
 ## Creating Certificates & Authentication to enable secure communication across all the Kubernetes components
-Run all the following steps and thereby generate the files in the Master node, and then copy the
-specific mentioned certs and config files to the worker nodes.
+This section creates all the necessary certificates and config files to enforce secure
+communication. Run all the following steps on the master node. We will have to copy
+some of the certs and config files generated to the worker nodes, in order to setup the
+worker components.
 
 ### Generating Certificates
 #### CA - Certificate Authority
@@ -205,20 +208,28 @@ keyUsage = nonRepudiation, digitalSignature, keyEncipherment
 subjectAltName = @alt_names
 [alt_names]
 IP.1 = 148.100.10.16
+#IP.2 If more workers are to be configured
 EOF
 ....
-#### Kube-proxy certificates (Worker)
+#### Kubelet certificates (for Worker node)
+....
+openssl genrsa -out kubelet-key.pem 2048
+openssl req -new -key kubelet-key.pem -out kubelet.csr -subj "/CN=kubelet" -config worker-openssl.cnf
+openssl x509 -req -in kubelet.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kubelet.pem -days 7200 -extensions v3_req -extfile worker-openssl.cnf
+....
+#### Kube-proxy certificates (for Worker node)
 ....
 openssl genrsa -out kube-proxy-key.pem 2048
 openssl req -new -key kube-proxy-key.pem -out kube-proxy.csr -subj "/CN=kube-proxy"
 openssl x509 -req -in kube-proxy.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kube-proxy.pem -days 7200
 ....
-#### Kubelet certificates (Worker)
-Note: 'k8s-worker' here refers to the hostname of the worker
+#### Worker node certificates
+Note: *k8sworker* here (and also in the next few steps) refers to the hostname of the worker & *148.100.10.16* refers to the worker node IP. Repeat the procedure after changing
+the hostname and IP to configure more worker nodes.
 ....
-openssl genrsa -out kubelet-key.pem 2048
-openssl req -new -key kubelet-key.pem -out kubelet.csr -subj "/CN=system:node:k8s-worker"
-openssl x509 -req -in kubelet.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kubelet.pem -days 7200 -extensions v3_req -extfile worker-openssl.cnf
+openssl genrsa -out k8sworker-worker-key.pem 2048
+WORKER_IP=148.100.10.16 openssl req -new -key k8sworker-worker-key.pem -out k8sworker-worker.csr -subj "/CN=system:node:k8sworker" -config worker-openssl.cnf
+WORKER_IP=148.100.10.16 openssl x509 -req -in k8sworker-worker.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out k8sworker-worker.pem -days 7200 -extensions v3_req -extfile worker-openssl.cnf
 ....
 #### Etcd OpenSSL config
 ....
@@ -278,21 +289,14 @@ kubectl config set-credentials kube-scheduler --client-certificate=/srv/kubernet
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-scheduler --kubeconfig=/var/lib/kube-scheduler/kubeconfig
 kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-scheduler/kubeconfig
 ....
-#### Kubelet Kubeconfig (for Worker Node)
+#### Kubelet Kubeconfig (for each Worker Node)
 ....
 TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.10.15:6443 --kubeconfig=kubelet.kubeconfig
-kubectl config set-credentials kubelet --client-certificate=/srv/kubernetes/kubelet.pem --client-key=/srv/kubernetes/kubelet-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=kubelet.kubeconfig
-kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kubelet --kubeconfig=kubelet.kubeconfig
-kubectl config use-context linux1.k8s --kubeconfig=kubelet.kubeconfig
-....
-#### Kube-proxy Kubeconfig (for Worker Node)
-....
-TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.10.15:6443 --kubeconfig=kube-proxy.kubeconfig
-kubectl config set-credentials kube-proxy --client-certificate=/srv/kubernetes/kube-proxy.pem --client-key=/srv/kubernetes/kube-proxy-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=kube-proxy.kubeconfig
-kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-proxy --kubeconfig=kube-proxy.kubeconfig
-kubectl config use-context linux1.k8s --kubeconfig=kube-proxy.kubeconfig
+kubectl config set-cluster linux1.k8s --certificate-authority=/root/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.99.99:6443 --kubeconfig=/root/srv/kubernetes/k8sworker-worker.kubeconfig
+kubectl config set-credentials k8sworker --client-certificate=/root/srv/kubernetes/k8sworker-worker.pem --client-key=/root/srv/kubernetes/k8sworker-worker-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/root/srv/kubernetes/k8sworker-worker.kubeconfig
+kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=k8sworker --kubeconfig=/root/srv/kubernetes/k8sworker-worker.kubeconfig
+kubectl config use-context linux1.k8s --kubeconfig=/root/srv/kubernetes/k8sworker-worker.kubeconfig
+scp k8sworker-worker.kubeconfig root@148.100.10.16:/root/srv/kubernetes/kubelet.kubeconfig
 ....
 #### Copy the required config files to the worker node(s)
 Similar to how we copied the certificates, we need to copy the configurations to the worker node(s)
@@ -412,10 +416,14 @@ the directory and give owner permissions to *etcd* user
 mkdir -p /data/etcd
 chown -R etcd:etcd /data/etcd
 ....
+Also, you need to modify the *working directory* value to the new directory in the etcd service file which would be
+`/usr/lib/systemd/system/etcd.service`.
+
 Now, we need to flush the IP tables in order for Etcd to run without issues. It can be done by running the following command
 ....
 iptables -F
 ....
+// or iptables REJECT FORWARD drop
 However, when we setup flannel in the next step, it will add more iptable rules required.
 
 Now, run the following commands to start *etcd*
@@ -438,7 +446,7 @@ on all the nodes.
 ### Adding an entry to etcd
 This should be run only once and only on the Master node
 ....
-etcdctl --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'
+etcdctl --endpoints https://148.100.10.15:2379 --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'
 ....
 ### Configure Flannel Settings
 Initialize the variables required for flanneld in the configuration
@@ -451,12 +459,14 @@ FLANNEL_ETCD_ENDPOINTS="https://148.100.10.15:2379"
 # ETCD Prefix for the -etcd-prefix argument
 FLANNEL_ETCD_KEY="/coreos.com/network"
 # Any additional options that you want to pass
-FLANNEL_OPTIONS="-subnet-file=/var/lib/flanneld/subnet.env \
+FLANNEL_OPTIONS="-iface=eth0 -subnet-file=/var/lib/flanneld/subnet.env \
 -etcd-cafile=/srv/kubernetes/ca.pem \
 -etcd-certfile=/srv/kubernetes/etcd.crt \
 -etcd-keyfile=/srv/kubernetes/etcd.key \
 -ip-masq=true"
 ....
+The 'iface' here should be the interface through which the nodes communicate and flannel will
+be configured for this interface.
 
 #### Configure Docker Settings
 Modify the docker configuration file ``/etc/sysconfig/docker`` to
@@ -484,7 +494,9 @@ sudo systemctl start flanneld
 ### Testing flanneld
 Once *flanneld* is started and *docker* daemon is restarted, running ```route -n``` on Master node
 and Worker node(s) the bridge established can be seen with the interface name as 'flannelx'. Also
-the IP of the nodes on the flannel networks can be seen by running ```ip a``` on all the nodes.
+the IP of the nodes on the flannel networks can be seen by running ```ip a``` on all the nodes. If in case
+you are not able to ping any IP's on the flannel network, try running `iptables -F` and check. By flushing
+the ip tables, we will be clearing any unwanted filtering of the packets.
 
 ## Setting up Kubernetes components on the Nodes
 ### Master Components
@@ -646,12 +658,11 @@ KUBELET_ADDRESS="--address=148.100.10.16"
 # KUBELET_PORT="--port=10250"
 
 # You may leave this blank to use the actual hostname
-#KUBELET_HOSTNAME="--hostname-override=127.0.0.1"
 KUBELET_HOSTNAME="--hostname-override=148.100.10.16"
 
 # Add your own!
 KUBELET_ARGS="--pod-manifest-path=/etc/kubernetes/manifests \
---kubeconfig=/var/lib/kubelet/kubeconfig \
+--kubeconfig=/srv/kubernetes/kubelet.kubeconfig \
 --tls-cert-file=/srv/kubernetes/kubelet.pem \
 --tls-private-key-file=/srv/kubernetes/kubelet-key.pem \
 --cert-dir=/var/lib/kubelet \
@@ -675,7 +686,7 @@ KUBELET_ARGS="--pod-manifest-path=/etc/kubernetes/manifests \
 # Add your own!
 KUBE_PROXY_ARGS="--cluster-cidr=100.64.0.0/16 \
 --masquerade-all=true \
---kubeconfig=/var/lib/kube-proxy/kubeconfig \
+--kubeconfig=/srv/kubernetes/kubelet.kubeconfig \
 --proxy-mode=iptables"
 ....
 #### Start the worker components
@@ -711,16 +722,251 @@ NAME         STATUS    ROLES     AGE       VERSION
 ### Deploy ngninx
 Let's run an Ngnix app on the cluster.
 ....
-kubectl run nginx --image=nginx --port=80 --replicas=3
+kubectl run nginx --image=nginx --port=80
 kubectl get pods -o wide
-kubectl expose deployment nginx --type NodePort
-NODE_PORT=$(kubectl get svc nginx --output=jsonpath='{range .spec.ports[0]}{.nodePort}')
-curl http://148.100.10.16:${NODE_PORT} #The IP is of Worker node
+curl http://100.64.80.1 #The IP of any of the nginx pod from the above command
+#You should get the nginx welcome page as the result if everything is working fine
 ....
+## Setting up Kube-dns
+I will use the following yaml derived from the official kubernetes repository,
+made some changes (which are highlighted in red). Make sure the clusterIP here
+is same as what we provide as parameters to the Kubernetes components.
+[subs="quotes"]
+....
+# Copyright 2016 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/name: "KubeDNS"
+spec:
+  selector:
+    k8s-app: kube-dns
+  [red]#clusterIP: 100.65.0.10#
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+  - name: dns-tcp
+    port: 53
+    protocol: TCP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  # replicas: not specified here:
+  # 1. In order to make Addon Manager do not reconcile this replicas parameter.
+  # 2. Default is 1.
+  # 3. Will be tuned in real time if DNS horizontal auto-scaling is turned on.
+  strategy:
+    rollingUpdate:
+      maxSurge: 10%
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      k8s-app: kube-dns
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-dns
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      tolerations:
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"
+      volumes:
+      - name: kube-dns-config
+        configMap:
+          name: kube-dns
+          optional: true
+      [red]#- hostPath:
+          path: /srv/kubernetes
+        name: ssl-certs-kubernetes#
+      containers:
+      - name: kubedns
+        image: gcr.io/google_containers/k8s-dns-kube-dns-s390x:1.14.7
+        resources:
+          # TODO: Set memory limits when we've profiled the container for large
+          # clusters, then set request = limit to keep this container in
+          # guaranteed class. Currently, this container falls into the
+          # "burstable" category so the kubelet doesn't backoff from restarting it.
+          limits:
+            memory: 170Mi
+          requests:
+            cpu: 100m
+            memory: 70Mi
+        livenessProbe:
+          httpGet:
+            path: /healthcheck/kubedns
+            port: 10054
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /readiness
+            port: 8081
+            scheme: HTTP
+          # we poll on pod startup for the Kubernetes master service and
+          # only setup the /readiness HTTP server once that's available.
+          initialDelaySeconds: 3
+          timeoutSeconds: 5
+        args:
+        - --domain=cluster.local.
+        - --dns-port=10053
+        [red]#- --kube-master-url=https://148.100.10.15:6443
+        - --config-dir=/kube-dns-config
+        - --kubecfg-file=/srv/kubernetes/kubelet.kubeconfig#
+        - --v=2
+        env:
+        - name: PROMETHEUS_PORT
+          value: "10055"
+        ports:
+        - containerPort: 10053
+          name: dns-local
+          protocol: UDP
+        - containerPort: 10053
+          name: dns-tcp-local
+          protocol: TCP
+        - containerPort: 10055
+          name: metrics
+          protocol: TCP
+        volumeMounts:
+        - name: kube-dns-config
+          mountPath: /kube-dns-config
+        [red]#- name: ssl-certs-kubernetes
+          mountPath: /srv/kubernetes
+          readOnly: true#
+      - name: dnsmasq
+        image: gcr.io/google_containers/k8s-dns-dnsmasq-nanny-s390x:1.14.7
+        livenessProbe:
+          httpGet:
+            path: /healthcheck/dnsmasq
+            port: 10054
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        args:
+        - -v=2
+        - -logtostderr
+        - -configDir=/etc/k8s/dns/dnsmasq-nanny
+        - -restartDnsmasq=true
+        - --
+        - -k
+        - --cache-size=1000
+        - --no-negcache
+        - --log-facility=-
+        - --server=/cluster.local/127.0.0.1#10053
+        - --server=/in-addr.arpa/127.0.0.1#10053
+        - --server=/ip6.arpa/127.0.0.1#10053
+        ports:
+        - containerPort: 53
+          name: dns
+          protocol: UDP
+        - containerPort: 53
+          name: dns-tcp
+          protocol: TCP
+        # see: https://github.com/kubernetes/kubernetes/issues/29055 for details
+        resources:
+          requests:
+            cpu: 150m
+            memory: 20Mi
+        volumeMounts:
+        - name: kube-dns-config
+          mountPath: /etc/k8s/dns/dnsmasq-nanny
+      - name: sidecar
+        image: gcr.io/google_containers/k8s-dns-sidecar-s390x:1.14.7
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 10054
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        args:
+        - --v=2
+        - --logtostderr
+        - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.cluster.local,5,SRV
+        - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.cluster.local,5,SRV
+        ports:
+        - containerPort: 10054
+          name: metrics
+          protocol: TCP
+        resources:
+          requests:
+            memory: 20Mi
+            cpu: 10m
+      dnsPolicy: Default  # Don't use cluster DNS.
+      serviceAccountName: kube-dns
+....
+To deploy the kube-dns pod, save the yaml as say `kube-dns.yaml` and
+run the command `kubectl apply -f kube-dns.yaml`. In a few minutes,
+the pods will start running. Run the following commands to verify if
+kubedns is running as intended.
+....
+kubectl create -f https://k8s.io/examples/admin/dns/busybox.yaml
+#Wait for the pod to start
+kubectl exec -ti busybox -- nslookup kubernetes.default.svc.cluster.local
+# This should result in returning the Kubernetes cluster IP
+....
+If in case the 'nslookup' is throwing up an error saying can't reach server, try stopping the `systemd-resolve` service and try.
+
 ## Troubleshooting
 - If any of the Kubernetes component throws up an error, check the reason for the error by observing the logs
 of the service using ```journalctl -fu <service name>```
 - To debug a kubectl command, use the flag ```-v=<log level>```
+- Get logs of a pod using 'kubectl logs'
+- Exec into a pod in case you want to dabble with the service or app directly
+- Specific container 'exec' or 'logs' can be looked at by directly using the 'docker' commands and the appropriate container name or ID
 
 ## References
 - https://github.com/linux-on-ibm-z/docs/wiki/Building-etcd

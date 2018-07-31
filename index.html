@@ -437,8 +437,8 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div class="details">
 <span id="author" class="author">Rajula Vineet Reddy</span><br>
 <span id="email" class="email"><a href="mailto:rajula96reddy@gmail.com">rajula96reddy@gmail.com</a></span><br>
-<span id="revnumber">version 1.0,</span>
-<span id="revdate">2018-07-26</span>
+<span id="revnumber">version 2.0,</span>
+<span id="revdate">2018-07-31</span>
 </div>
 <div id="toc" class="toc2">
 <div id="toctitle">Table of Contents</div>
@@ -484,6 +484,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <li><a href="#_deploy_ngninx">Deploy ngninx</a></li>
 </ul>
 </li>
+<li><a href="#_setting_up_kube_dns">Setting up Kube-dns</a></li>
 <li><a href="#_troubleshooting">Troubleshooting</a></li>
 <li><a href="#_references">References</a></li>
 </ul>
@@ -599,6 +600,11 @@ are as follows</p>
 </tr>
 </tfoot>
 </table>
+</li>
+<li>
+<p>It is recommended to login as root on all the nodes, as we will be dealing with files and tools which require
+root permissions. You can login as root from another account using <code>sudo -i</code>. If not, use <strong>sudo</strong>
+before a command wherever required. Anyways, just to be safe I will include sudo where required.</p>
 </li>
 <li>
 <p>Enable IP forward settings on all the worker node(s) so that, the containers are able to ping the internet using the following commands</p>
@@ -717,8 +723,10 @@ sudo zypper in kubernetes-node flannel</pre>
 <h2 id="_creating_certificates_authentication_to_enable_secure_communication_across_all_the_kubernetes_components">Creating Certificates &amp; Authentication to enable secure communication across all the Kubernetes components</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>Run all the following steps and thereby generate the files in the Master node, and then copy the
-specific mentioned certs and config files to the worker nodes.</p>
+<p>This section creates all the necessary certificates and config files to enforce secure
+communication. Run all the following steps on the master node. We will have to copy
+some of the certs and config files generated to the worker nodes, in order to setup the
+worker components.</p>
 </div>
 <div class="sect2">
 <h3 id="_generating_certificates">Generating Certificates</h3>
@@ -816,12 +824,23 @@ keyUsage = nonRepudiation, digitalSignature, keyEncipherment
 subjectAltName = @alt_names
 [alt_names]
 IP.1 = 148.100.10.16
+#IP.2 If more workers are to be configured
 EOF</pre>
 </div>
 </div>
 </div>
 <div class="sect3">
-<h4 id="_kube_proxy_certificates_worker">Kube-proxy certificates (Worker)</h4>
+<h4 id="_kubelet_certificates_for_worker_node">Kubelet certificates (for Worker node)</h4>
+<div class="literalblock">
+<div class="content">
+<pre>openssl genrsa -out kubelet-key.pem 2048
+openssl req -new -key kubelet-key.pem -out kubelet.csr -subj "/CN=kubelet" -config worker-openssl.cnf
+openssl x509 -req -in kubelet.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kubelet.pem -days 7200 -extensions v3_req -extfile worker-openssl.cnf</pre>
+</div>
+</div>
+</div>
+<div class="sect3">
+<h4 id="_kube_proxy_certificates_for_worker_node">Kube-proxy certificates (for Worker node)</h4>
 <div class="literalblock">
 <div class="content">
 <pre>openssl genrsa -out kube-proxy-key.pem 2048
@@ -831,15 +850,16 @@ openssl x509 -req -in kube-proxy.csr -CA ca.pem -CAkey ca-key.pem -CAcreateseria
 </div>
 </div>
 <div class="sect3">
-<h4 id="_kubelet_certificates_worker">Kubelet certificates (Worker)</h4>
+<h4 id="_worker_node_certificates">Worker node certificates</h4>
 <div class="paragraph">
-<p>Note: 'k8s-worker' here refers to the hostname of the worker</p>
+<p>Note: <strong>k8sworker</strong> here (and also in the next few steps) refers to the hostname of the worker &amp; <strong>148.100.10.16</strong> refers to the worker node IP. Repeat the procedure after changing
+the hostname and IP to configure more worker nodes.</p>
 </div>
 <div class="literalblock">
 <div class="content">
-<pre>openssl genrsa -out kubelet-key.pem 2048
-openssl req -new -key kubelet-key.pem -out kubelet.csr -subj "/CN=system:node:k8s-worker"
-openssl x509 -req -in kubelet.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kubelet.pem -days 7200 -extensions v3_req -extfile worker-openssl.cnf</pre>
+<pre>openssl genrsa -out k8sworker-worker-key.pem 2048
+WORKER_IP=148.100.10.16 openssl req -new -key k8sworker-worker-key.pem -out k8sworker-worker.csr -subj "/CN=system:node:k8sworker" -config worker-openssl.cnf
+WORKER_IP=148.100.10.16 openssl x509 -req -in k8sworker-worker.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out k8sworker-worker.pem -days 7200 -extensions v3_req -extfile worker-openssl.cnf</pre>
 </div>
 </div>
 </div>
@@ -924,26 +944,15 @@ kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-scheduler/kubec
 </div>
 </div>
 <div class="sect3">
-<h4 id="_kubelet_kubeconfig_for_worker_node">Kubelet Kubeconfig (for Worker Node)</h4>
+<h4 id="_kubelet_kubeconfig_for_each_worker_node">Kubelet Kubeconfig (for each Worker Node)</h4>
 <div class="literalblock">
 <div class="content">
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.10.15:6443 --kubeconfig=kubelet.kubeconfig
-kubectl config set-credentials kubelet --client-certificate=/srv/kubernetes/kubelet.pem --client-key=/srv/kubernetes/kubelet-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=kubelet.kubeconfig
-kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kubelet --kubeconfig=kubelet.kubeconfig
-kubectl config use-context linux1.k8s --kubeconfig=kubelet.kubeconfig</pre>
-</div>
-</div>
-</div>
-<div class="sect3">
-<h4 id="_kube_proxy_kubeconfig_for_worker_node">Kube-proxy Kubeconfig (for Worker Node)</h4>
-<div class="literalblock">
-<div class="content">
-<pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.10.15:6443 --kubeconfig=kube-proxy.kubeconfig
-kubectl config set-credentials kube-proxy --client-certificate=/srv/kubernetes/kube-proxy.pem --client-key=/srv/kubernetes/kube-proxy-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=kube-proxy.kubeconfig
-kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-proxy --kubeconfig=kube-proxy.kubeconfig
-kubectl config use-context linux1.k8s --kubeconfig=kube-proxy.kubeconfig</pre>
+kubectl config set-cluster linux1.k8s --certificate-authority=/root/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.99.99:6443 --kubeconfig=/root/srv/kubernetes/k8sworker-worker.kubeconfig
+kubectl config set-credentials k8sworker --client-certificate=/root/srv/kubernetes/k8sworker-worker.pem --client-key=/root/srv/kubernetes/k8sworker-worker-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/root/srv/kubernetes/k8sworker-worker.kubeconfig
+kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=k8sworker --kubeconfig=/root/srv/kubernetes/k8sworker-worker.kubeconfig
+kubectl config use-context linux1.k8s --kubeconfig=/root/srv/kubernetes/k8sworker-worker.kubeconfig
+scp k8sworker-worker.kubeconfig root@148.100.10.16:/root/srv/kubernetes/kubelet.kubeconfig</pre>
 </div>
 </div>
 </div>
@@ -1085,6 +1094,10 @@ chown -R etcd:etcd /data/etcd</pre>
 </div>
 </div>
 <div class="paragraph">
+<p>Also, you need to modify the <strong>working directory</strong> value to the new directory in the etcd service file which would be
+<code>/usr/lib/systemd/system/etcd.service</code>.</p>
+</div>
+<div class="paragraph">
 <p>Now, we need to flush the IP tables in order for Etcd to run without issues. It can be done by running the following command</p>
 </div>
 <div class="literalblock">
@@ -1133,7 +1146,7 @@ on all the nodes.</p>
 </div>
 <div class="literalblock">
 <div class="content">
-<pre>etcdctl --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'</pre>
+<pre>etcdctl --endpoints https://148.100.10.15:2379 --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'</pre>
 </div>
 </div>
 </div>
@@ -1152,12 +1165,16 @@ FLANNEL_ETCD_ENDPOINTS="https://148.100.10.15:2379"
 # ETCD Prefix for the -etcd-prefix argument
 FLANNEL_ETCD_KEY="/coreos.com/network"
 # Any additional options that you want to pass
-FLANNEL_OPTIONS="-subnet-file=/var/lib/flanneld/subnet.env \
+FLANNEL_OPTIONS="-iface=eth0 -subnet-file=/var/lib/flanneld/subnet.env \
 -etcd-cafile=/srv/kubernetes/ca.pem \
 -etcd-certfile=/srv/kubernetes/etcd.crt \
 -etcd-keyfile=/srv/kubernetes/etcd.key \
 -ip-masq=true"</pre>
 </div>
+</div>
+<div class="paragraph">
+<p>The 'iface' here should be the interface through which the nodes communicate and flannel will
+be configured for this interface.</p>
 </div>
 <div class="sect3">
 <h4 id="_configure_docker_settings">Configure Docker Settings</h4>
@@ -1199,7 +1216,9 @@ sudo systemctl start flanneld</pre>
 <div class="paragraph">
 <p>Once <strong>flanneld</strong> is started and <strong>docker</strong> daemon is restarted, running <code><code>route -n</code></code> on Master node
 and Worker node(s) the bridge established can be seen with the interface name as 'flannelx'. Also
-the IP of the nodes on the flannel networks can be seen by running <code><code>ip a</code></code> on all the nodes.</p>
+the IP of the nodes on the flannel networks can be seen by running <code><code>ip a</code></code> on all the nodes. If in case
+you are not able to ping any IP&#8217;s on the flannel network, try running <code>iptables -F</code> and check. By flushing
+the ip tables, we will be clearing any unwanted filtering of the packets.</p>
 </div>
 </div>
 </div>
@@ -1396,12 +1415,11 @@ KUBELET_ADDRESS="--address=148.100.10.16"
 # KUBELET_PORT="--port=10250"
 
 # You may leave this blank to use the actual hostname
-#KUBELET_HOSTNAME="--hostname-override=127.0.0.1"
 KUBELET_HOSTNAME="--hostname-override=148.100.10.16"
 
 # Add your own!
 KUBELET_ARGS="--pod-manifest-path=/etc/kubernetes/manifests \
---kubeconfig=/var/lib/kubelet/kubeconfig \
+--kubeconfig=/srv/kubernetes/kubelet.kubeconfig \
 --tls-cert-file=/srv/kubernetes/kubelet.pem \
 --tls-private-key-file=/srv/kubernetes/kubelet-key.pem \
 --cert-dir=/var/lib/kubelet \
@@ -1429,7 +1447,7 @@ KUBELET_ARGS="--pod-manifest-path=/etc/kubernetes/manifests \
 # Add your own!
 KUBE_PROXY_ARGS="--cluster-cidr=100.64.0.0/16 \
 --masquerade-all=true \
---kubeconfig=/var/lib/kube-proxy/kubeconfig \
+--kubeconfig=/srv/kubernetes/kubelet.kubeconfig \
 --proxy-mode=iptables"</pre>
 </div>
 </div>
@@ -1499,13 +1517,257 @@ etcd-0               Healthy   {"health":"true"}</pre>
 </div>
 <div class="literalblock">
 <div class="content">
-<pre>kubectl run nginx --image=nginx --port=80 --replicas=3
+<pre>kubectl run nginx --image=nginx --port=80
 kubectl get pods -o wide
-kubectl expose deployment nginx --type NodePort
-NODE_PORT=$(kubectl get svc nginx --output=jsonpath='{range .spec.ports[0]}{.nodePort}')
-curl http://148.100.10.16:${NODE_PORT} #The IP is of Worker node</pre>
+curl http://100.64.80.1 #The IP of any of the nginx pod from the above command
+#You should get the nginx welcome page as the result if everything is working fine</pre>
 </div>
 </div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_setting_up_kube_dns">Setting up Kube-dns</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>I will use the following yaml derived from the official kubernetes repository,
+made some changes (which are highlighted in red). Make sure the clusterIP here
+is same as what we provide as parameters to the Kubernetes components.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre># Copyright 2016 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+    kubernetes.io/name: "KubeDNS"
+spec:
+  selector:
+    k8s-app: kube-dns
+  <span class="red">clusterIP: 100.65.0.10</span>
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+  - name: dns-tcp
+    port: 53
+    protocol: TCP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  # replicas: not specified here:
+  # 1. In order to make Addon Manager do not reconcile this replicas parameter.
+  # 2. Default is 1.
+  # 3. Will be tuned in real time if DNS horizontal auto-scaling is turned on.
+  strategy:
+    rollingUpdate:
+      maxSurge: 10%
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      k8s-app: kube-dns
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-dns
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      tolerations:
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"
+      volumes:
+      - name: kube-dns-config
+        configMap:
+          name: kube-dns
+          optional: true
+      <span class="red">- hostPath:
+          path: /srv/kubernetes
+        name: ssl-certs-kubernetes</span>
+      containers:
+      - name: kubedns
+        image: gcr.io/google_containers/k8s-dns-kube-dns-s390x:1.14.7
+        resources:
+          # TODO: Set memory limits when we've profiled the container for large
+          # clusters, then set request = limit to keep this container in
+          # guaranteed class. Currently, this container falls into the
+          # "burstable" category so the kubelet doesn't backoff from restarting it.
+          limits:
+            memory: 170Mi
+          requests:
+            cpu: 100m
+            memory: 70Mi
+        livenessProbe:
+          httpGet:
+            path: /healthcheck/kubedns
+            port: 10054
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /readiness
+            port: 8081
+            scheme: HTTP
+          # we poll on pod startup for the Kubernetes master service and
+          # only setup the /readiness HTTP server once that's available.
+          initialDelaySeconds: 3
+          timeoutSeconds: 5
+        args:
+        - --domain=cluster.local.
+        - --dns-port=10053
+        <span class="red">- --kube-master-url=https://148.100.10.15:6443
+        - --config-dir=/kube-dns-config
+        - --kubecfg-file=/srv/kubernetes/kubelet.kubeconfig</span>
+        - --v=2
+        env:
+        - name: PROMETHEUS_PORT
+          value: "10055"
+        ports:
+        - containerPort: 10053
+          name: dns-local
+          protocol: UDP
+        - containerPort: 10053
+          name: dns-tcp-local
+          protocol: TCP
+        - containerPort: 10055
+          name: metrics
+          protocol: TCP
+        volumeMounts:
+        - name: kube-dns-config
+          mountPath: /kube-dns-config
+        <span class="red">- name: ssl-certs-kubernetes
+          mountPath: /srv/kubernetes
+          readOnly: true</span>
+      - name: dnsmasq
+        image: gcr.io/google_containers/k8s-dns-dnsmasq-nanny-s390x:1.14.7
+        livenessProbe:
+          httpGet:
+            path: /healthcheck/dnsmasq
+            port: 10054
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        args:
+        - -v=2
+        - -logtostderr
+        - -configDir=/etc/k8s/dns/dnsmasq-nanny
+        - -restartDnsmasq=true
+        - --
+        - -k
+        - --cache-size=1000
+        - --no-negcache
+        - --log-facility=-
+        - --server=/cluster.local/127.0.0.1#10053
+        - --server=/in-addr.arpa/127.0.0.1#10053
+        - --server=/ip6.arpa/127.0.0.1#10053
+        ports:
+        - containerPort: 53
+          name: dns
+          protocol: UDP
+        - containerPort: 53
+          name: dns-tcp
+          protocol: TCP
+        # see: https://github.com/kubernetes/kubernetes/issues/29055 for details
+        resources:
+          requests:
+            cpu: 150m
+            memory: 20Mi
+        volumeMounts:
+        - name: kube-dns-config
+          mountPath: /etc/k8s/dns/dnsmasq-nanny
+      - name: sidecar
+        image: gcr.io/google_containers/k8s-dns-sidecar-s390x:1.14.7
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: 10054
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        args:
+        - --v=2
+        - --logtostderr
+        - --probe=kubedns,127.0.0.1:10053,kubernetes.default.svc.cluster.local,5,SRV
+        - --probe=dnsmasq,127.0.0.1:53,kubernetes.default.svc.cluster.local,5,SRV
+        ports:
+        - containerPort: 10054
+          name: metrics
+          protocol: TCP
+        resources:
+          requests:
+            memory: 20Mi
+            cpu: 10m
+      dnsPolicy: Default  # Don't use cluster DNS.
+      serviceAccountName: kube-dns</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>To deploy the kube-dns pod, save the yaml as say <code>kube-dns.yaml</code> and
+run the command <code>kubectl apply -f kube-dns.yaml</code>. In a few minutes,
+the pods will start running. Run the following commands to verify if
+kubedns is running as intended.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>kubectl create -f https://k8s.io/examples/admin/dns/busybox.yaml
+#Wait for the pod to start
+kubectl exec -ti busybox -- nslookup kubernetes.default.svc.cluster.local
+# This should result in returning the Kubernetes cluster IP</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If in case the 'nslookup' is throwing up an error saying can&#8217;t reach server, try stopping the <code>systemd-resolve</code> service and try.</p>
 </div>
 </div>
 </div>
@@ -1520,6 +1782,15 @@ of the service using <code><code>journalctl -fu &lt;service name&gt;</code></cod
 </li>
 <li>
 <p>To debug a kubectl command, use the flag <code><code>-v=&lt;log level&gt;</code></code></p>
+</li>
+<li>
+<p>Get logs of a pod using 'kubectl logs'</p>
+</li>
+<li>
+<p>Exec into a pod in case you want to dabble with the service or app directly</p>
+</li>
+<li>
+<p>Specific container 'exec' or 'logs' can be looked at by directly using the 'docker' commands and the appropriate container name or ID</p>
 </li>
 </ul>
 </div>
@@ -1555,8 +1826,8 @@ of the service using <code><code>journalctl -fu &lt;service name&gt;</code></cod
 </div>
 <div id="footer">
 <div id="footer-text">
-Version 1.0<br>
-Last updated 2018-07-27 01:31:53 IST
+Version 2.0<br>
+Last updated 2018-08-01 01:17:16 IST
 </div>
 </div>
 </body>
