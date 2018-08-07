@@ -602,7 +602,7 @@ Flannel does use etcd for mapping subnet to host. So by running the below comman
 etcdctl --endpoints https://148.100.98.173:2379 --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'
 ....
 
- Your /etc/sysconfig/flanneld file should look like this but you need to replace your master ip in place of etcd endpoints.
+Your /etc/sysconfig/flanneld file should look like this but you need to replace your etcd endpoints.
 
 ....
 # Flanneld configuration options
@@ -645,10 +645,6 @@ After adding the above line reload the docker daemon and restart it.
 
 *Kube-apiserver*
 
-*About kube-apiserver*
-
-Its role is to put the stuff into the etcd.
-
 *Setting up kube-apiserver as systemd service*
 
 ....
@@ -662,7 +658,7 @@ After=network.target etcd.service flanneld.service
 EnvironmentFile=-/var/lib/flanneld/subnet.env
 ExecStart=/usr/bin/kube-apiserver \\
  --bind-address=0.0.0.0 \\
- --advertise-address=148.100.99.252 \\
+ --advertise-address=148.100.98.173\\
  --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota \\
  --anonymous-auth=false \\
  --apiserver-count=1 \\
@@ -671,7 +667,7 @@ ExecStart=/usr/bin/kube-apiserver \\
  --etcd-cafile=/srv/kubernetes/ca.pem \\
  --etcd-certfile=/srv/kubernetes/etcd.crt \\
  --etcd-keyfile=/srv/kubernetes/etcd.key \\
- --etcd-servers=https://148.100.99.252:2379 \\
+ --etcd-servers=https://148.100.98.173:2379 \\
  --enable-swagger-ui=true \\
  --insecure-bind-address=0.0.0.0 \\
  --kubelet-certificate-authority=/srv/kubernetes/ca.pem \\
@@ -855,7 +851,6 @@ Documentation=https://github.com/kubernetes/kubernetes
 ExecStart=/usr/bin/kube-proxy \\
   --cluster-cidr=100.64.0.0/16 \\
   --masquerade-all=true \\
-  --kubeconfig=/var/lib/kube-proxy/kubeconfig \\
   --proxy-mode=iptables
 Restart=on-failure
 RestartSec=10

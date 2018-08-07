@@ -1238,10 +1238,8 @@ they can use the docker bridge otherwise they use the encaptulation and UDP in o
 <pre>etcdctl --endpoints https://148.100.98.173:2379 --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'</pre>
 </div>
 </div>
-<div class="literalblock">
-<div class="content">
-<pre>Your /etc/sysconfig/flanneld file should look like this but you need to replace your master ip in place of etcd endpoints.</pre>
-</div>
+<div class="paragraph">
+<p>Your /etc/sysconfig/flanneld file should look like this but you need to replace your etcd endpoints.</p>
 </div>
 <div class="literalblock">
 <div class="content">
@@ -1302,12 +1300,6 @@ in /var/lib/flanneld. The value of bip is that of FLANNEL_SUBNET and the value o
 <p><strong>Kube-apiserver</strong></p>
 </div>
 <div class="paragraph">
-<p><strong>About kube-apiserver</strong></p>
-</div>
-<div class="paragraph">
-<p>Its role is to put the stuff into the etcd.</p>
-</div>
-<div class="paragraph">
 <p><strong>Setting up kube-apiserver as systemd service</strong></p>
 </div>
 <div class="literalblock">
@@ -1322,7 +1314,7 @@ After=network.target etcd.service flanneld.service
 EnvironmentFile=-/var/lib/flanneld/subnet.env
 ExecStart=/usr/bin/kube-apiserver \\
  --bind-address=0.0.0.0 \\
- --advertise-address=148.100.99.252 \\
+ --advertise-address=148.100.98.173\\
  --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,DefaultStorageClass,DefaultTolerationSeconds,ResourceQuota \\
  --anonymous-auth=false \\
  --apiserver-count=1 \\
@@ -1331,7 +1323,7 @@ ExecStart=/usr/bin/kube-apiserver \\
  --etcd-cafile=/srv/kubernetes/ca.pem \\
  --etcd-certfile=/srv/kubernetes/etcd.crt \\
  --etcd-keyfile=/srv/kubernetes/etcd.key \\
- --etcd-servers=https://148.100.99.252:2379 \\
+ --etcd-servers=https://148.100.98.173:2379 \\
  --enable-swagger-ui=true \\
  --insecure-bind-address=0.0.0.0 \\
  --kubelet-certificate-authority=/srv/kubernetes/ca.pem \\
@@ -1540,7 +1532,6 @@ Documentation=https://github.com/kubernetes/kubernetes
 ExecStart=/usr/bin/kube-proxy \\
   --cluster-cidr=100.64.0.0/16 \\
   --masquerade-all=true \\
-  --kubeconfig=/var/lib/kube-proxy/kubeconfig \\
   --proxy-mode=iptables
 Restart=on-failure
 RestartSec=10
@@ -1933,7 +1924,7 @@ kubectl create -f https://k8s.io/examples/admin/dns/busybox.yaml</pre>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2018-08-07 18:39:06 IST
+Last updated 2018-08-07 18:50:00 IST
 </div>
 </div>
 </body>
