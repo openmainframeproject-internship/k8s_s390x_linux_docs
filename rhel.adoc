@@ -21,7 +21,8 @@ A kubernetes cluster consists of these essential components
 The following components have been used.
 [%header,cols=2*,width="30%"]
 |===
-
+|Component
+|Version
 |Instances
 |RHEL 7.4 flavour of L1CC
 |ETCD
@@ -330,7 +331,6 @@ kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca
 kubectl config set-credentials kubeworker.novalocal --client-certificate=/srv/kubernetes/kubeworker.novalocal-worker.pem --client-key=/srv/kubernetes/kubeworker.novalocal-worker-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/srv/kubernetes/kubeworker.novalocal-worker.kubeconfig
 kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kubeworker.novalocal --kubeconfig=/srv/kubernetes/kubeworker.novalocal-worker.kubeconfig
 kubectl config use-context linux1.k8s --kubeconfig=/srv/kubernetes/kubeworker.novalocal-worker.kubeconfig
-scp k8sworker-worker.kubeconfig root@148.100.98.174:/srv/kubernetes/kubelet.kubeconfig
 ....
 
 Copy the required config files to the worker node/nodes
