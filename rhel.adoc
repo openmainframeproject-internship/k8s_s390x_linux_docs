@@ -7,14 +7,15 @@ Out of these two VMs one acts as master and other acts as slave. Create two inst
 A kubernetes cluster consists of these essential components
 
 ....
-1. etcd (distributed key-value storage)
-2. apiserver
-3. scheduler
-4. controller manager
-5. kubectl (command line client for kubernetes)
+1. Etcd (distributed key-value storage)
+2. Server
+3. Scheduler
+4. Controller manager
+5. Kubectl (command line client for kubernetes)
 5. Docker (container)
-6. kubelet
-7. kube-proxy
+6. Kubelet
+7. Kube-proxy
+8. Flannel
 ....
 
 The following components have been used.
@@ -40,7 +41,7 @@ NOTE: All the commands have been run as root user. There may permission issues a
 
 Also copy the worker node keys to the master node because you will need them to transfer certificates and config files.
 ....
-scp -i master.pem worker1.pem worker2.pem root@148.100.98.174:/root
+scp -i master.pem <PATH_OF_WORKER_NODES>/{worker1.pem,worker2.pem} root@148.100.98.174:/root
 ....
 
 Do this to boot using the latest kernel and reboot after this step
@@ -148,9 +149,9 @@ mkdir -p /var/lib/{kubelet}
 
 
 
-NOTE: In this documnetation whereever 148.100.98.173 is used you should use your master ip there and inplace of 148.100.98.174 use your worker ip.
-== Certificates
+NOTE: In this documnetation whereever 148.100.98.173 has been used you should use your master ip there and inplace of 148.100.98.174 use your worker ip.
 
+== Certificates
 
 ....
 cd /srv/kubernetes
@@ -284,7 +285,7 @@ openssl x509 -req -sha256 -CA ca.pem -CAkey ca-key.pem -CAcreateserial -in etcd.
 Copy the required keys to the worker node/nodes
 
 ....
-scp -i <path_where_your_worker_keys_are> ca.pem etcd.crt etcd.key kubelet.pem kubelet-key.pem root@148.100.98.174:/srv/kubernetes/
+scp -i <path_where_your_worker_keys_are> /srv/kubernetes/{ca.pem,etcd.crt,etcd.key,kubelet.pem,kubelet-key.pem} root@148.100.98.174:/srv/kubernetes/
 ....
 
 == Configuation files
@@ -393,7 +394,7 @@ LimitNOFILE=65536
 WantedBy=multi-user.target
 ....
 
-Modify the configuration file in the /etc/etcd/etcd.conf should look like this after all the modifications. But do note to change the ipaddresses
+Modify the configuration file in the /etc/etcd/etcd.conf and it should look like this after all the modifications. But do note to change the ip address.
 
 ....
 #[Member]
@@ -511,8 +512,6 @@ ddd902eabd9d33b7: name=default peerURLs=http://148.100.98.173:2380 clientURLs=ht
 ....
 
 
-NOTE: At times when you try to restart etcd service it may not get started because the previous instance might not have been killed. So using netstat to check that and find the PID and kill it.
-
 == Docker
 
 You need not install *Docker CE* because it is present in /usr/local/bin folder. But this docker does have a service file related to it.
@@ -603,7 +602,27 @@ Flannel does use etcd for mapping subnet to host. So by running the below comman
 etcdctl --endpoints https://148.100.98.173:2379 --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'
 ....
 
+ Your /etc/sysconfig/flanneld file should look like this but you need to replace your master ip in place of etcd endpoints.
 
+....
+# Flanneld configuration options
+
+# etcd url location.  Point this to the server where etcd runs
+FLANNEL_ETCD_ENDPOINTS="https://148.100.98.173:2379"
+
+# etcd config key.  This is the configuration key that flannel queries
+# For address range assignment
+#FLANNEL_ETCD_PREFIX="/coreos.com/network"
+FLANNEL_ETCD_KEY="/coreos.com/network"
+
+# Any additional options that you want to pass
+
+FLANNEL_OPTIONS=" -subnet-file=/var/lib/flanneld/subnet.env \
+-etcd-cafile=/srv/kubernetes/ca.pem \
+-etcd-certfile=/srv/kubernetes/etcd.crt \
+-etcd-keyfile=/srv/kubernetes/etcd.key \
+-ip-masq=true"
+....
 
 *Commands to start, check status flanneld*
 
@@ -612,6 +631,17 @@ systemctl enable flanneld
 systemctl start flanneld
 systemctl status flanneld
 ....
+
+NOTE: If flannel bridge has been established then you should be able to ping those nodes.
+
+Do add the below line in the /etc/sysconfig/docker file by substituting the values of bip and mtu. You can get the values of bip and mtu in the env file of flanneld located
+in /var/lib/flanneld. The value of bip is that of FLANNEL_SUBNET and the value of mtu is that of FLANNEL_MTU.
+
+....
+DOCKER_OPTS="--bip= --mtu= --iptables=false --ip-masq=false --ip-forward=true"
+....
+
+After adding the above line reload the docker daemon and restart it.
 
 *Kube-apiserver*
 
@@ -687,14 +717,6 @@ Client Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.8", GitCommi
 Server Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.8", GitCommit:"c138b85178156011dc934c2c9f4837476876fb07", GitTreeState:"clean", BuildDate:"2018-05-21T18:53:18Z", GoVersion:"go1.9.3", Compiler:"gc", Platform:"linux/s390x"}
 ....
 
-For monitoring logs of kube-apiserver (optional)
-
-....
-journalctl -fu kube-apiserver
-....
-
-
-NOTE:  Monitor the logs when REST calls get exchange which indicates that the server has started.
 
 *Setting up Kube-scheduler*
 
@@ -870,9 +892,57 @@ accordingly.
 
 Now the kubernetes cluster is ready. Let's deploy nginx app.
 
+Run nginx
 ....
 kubectl run nginx --image=nginx
-kubectl get pods
+....
+
+See pod information
+....
+kubectl get pods -o wide
+....
+
+Tests to be done on the worker node
+....
+ping <POD_IP>
+....
+
+There should not be any packet loss
+....
+curl http://<POD_IP>
+....
+
+Output
+....
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+</style>
+</head>
+<body>
+<h1>Welcome to nginx!</h1>
+<p>If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.</p>
+
+<p>For online documentation and support please refer to
+<a href="http://nginx.org/">nginx.org</a>.<br/>
+Commercial support is available at
+<a href="http://nginx.com/">nginx.com</a>.</p>
+
+<p><em>Thank you for using nginx.</em></p>
+</body>
+</html>
+....
+
+If you want to remove the deployment
+....
 kubectl delete deployment nginx
 ....
 
@@ -1087,6 +1157,9 @@ spec:
 kubectl apply -f kube-dns.yaml
 kubectl create -f https://k8s.io/examples/admin/dns/busybox.yaml
 ....
+
+== Trroubleshooting options
+To view the latest logs of any service use journalctl -u <service_name> and press *shift + G* to view the latest logs.
 
 == References
 

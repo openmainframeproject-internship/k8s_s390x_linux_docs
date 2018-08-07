@@ -446,14 +446,15 @@ Out of these two VMs one acts as master and other acts as slave. Create two inst
 </div>
 <div class="literalblock">
 <div class="content">
-<pre>1. etcd (distributed key-value storage)
-2. apiserver
-3. scheduler
-4. controller manager
-5. kubectl (command line client for kubernetes)
+<pre>1. Etcd (distributed key-value storage)
+2. Server
+3. Scheduler
+4. Controller manager
+5. Kubectl (command line client for kubernetes)
 5. Docker (container)
-6. kubelet
-7. kube-proxy</pre>
+6. Kubelet
+7. Kube-proxy
+8. Flannel</pre>
 </div>
 </div>
 <div class="paragraph">
@@ -511,7 +512,7 @@ All the commands have been run as root user. There may permission issues at some
 </div>
 <div class="literalblock">
 <div class="content">
-<pre>scp -i master.pem worker1.pem worker2.pem root@148.100.98.174:/root</pre>
+<pre>scp -i master.pem &lt;PATH_OF_WORKER_NODES&gt;/{worker1.pem,worker2.pem} root@148.100.98.174:/root</pre>
 </div>
 </div>
 <div class="paragraph">
@@ -661,12 +662,16 @@ mkdir -p /var/lib/{kubelet}</pre>
 <div class="title">Note</div>
 </td>
 <td class="content">
-In this documnetation whereever 148.100.98.173 is used you should use your master ip there and inplace of 148.100.98.174 use your worker ip.
-== Certificates
+In this documnetation whereever 148.100.98.173 has been used you should use your master ip there and inplace of 148.100.98.174 use your worker ip.
 </td>
 </tr>
 </table>
 </div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="_certificates">Certificates</h2>
+<div class="sectionbody">
 <div class="literalblock">
 <div class="content">
 <pre>cd /srv/kubernetes
@@ -838,7 +843,7 @@ openssl x509 -req -sha256 -CA ca.pem -CAkey ca-key.pem -CAcreateserial -in etcd.
 </div>
 <div class="literalblock">
 <div class="content">
-<pre>scp -i &lt;path_where_your_worker_keys_are&gt; ca.pem etcd.crt etcd.key kubelet.pem kubelet-key.pem root@148.100.98.174:/srv/kubernetes/</pre>
+<pre>scp -i &lt;path_where_your_worker_keys_are&gt; /srv/kubernetes/{ca.pem,etcd.crt,etcd.key,kubelet.pem,kubelet-key.pem} root@148.100.98.174:/srv/kubernetes/</pre>
 </div>
 </div>
 </div>
@@ -974,7 +979,7 @@ WantedBy=multi-user.target</pre>
 </div>
 </div>
 <div class="paragraph">
-<p>Modify the configuration file in the /etc/etcd/etcd.conf should look like this after all the modifications. But do note to change the ipaddresses</p>
+<p>Modify the configuration file in the /etc/etcd/etcd.conf and it should look like this after all the modifications. But do note to change the ip address.</p>
 </div>
 <div class="literalblock">
 <div class="content">
@@ -1114,18 +1119,6 @@ cluster is healthy</pre>
 <pre>ddd902eabd9d33b7: name=default peerURLs=http://148.100.98.173:2380 clientURLs=http://148.100.98.173:2379 isLeader=true</pre>
 </div>
 </div>
-<div class="admonitionblock note">
-<table>
-<tr>
-<td class="icon">
-<div class="title">Note</div>
-</td>
-<td class="content">
-At times when you try to restart etcd service it may not get started because the previous instance might not have been killed. So using netstat to check that and find the PID and kill it.
-</td>
-</tr>
-</table>
-</div>
 </div>
 </div>
 <div class="sect1">
@@ -1245,6 +1238,32 @@ they can use the docker bridge otherwise they use the encaptulation and UDP in o
 <pre>etcdctl --endpoints https://148.100.98.173:2379 --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'</pre>
 </div>
 </div>
+<div class="literalblock">
+<div class="content">
+<pre>Your /etc/sysconfig/flanneld file should look like this but you need to replace your master ip in place of etcd endpoints.</pre>
+</div>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre># Flanneld configuration options
+
+# etcd url location.  Point this to the server where etcd runs
+FLANNEL_ETCD_ENDPOINTS="https://148.100.98.173:2379"
+
+# etcd config key.  This is the configuration key that flannel queries
+# For address range assignment
+#FLANNEL_ETCD_PREFIX="/coreos.com/network"
+FLANNEL_ETCD_KEY="/coreos.com/network"
+
+# Any additional options that you want to pass
+
+FLANNEL_OPTIONS=" -subnet-file=/var/lib/flanneld/subnet.env \
+-etcd-cafile=/srv/kubernetes/ca.pem \
+-etcd-certfile=/srv/kubernetes/etcd.crt \
+-etcd-keyfile=/srv/kubernetes/etcd.key \
+-ip-masq=true"</pre>
+</div>
+</div>
 <div class="paragraph">
 <p><strong>Commands to start, check status flanneld</strong></p>
 </div>
@@ -1254,6 +1273,30 @@ they can use the docker bridge otherwise they use the encaptulation and UDP in o
 systemctl start flanneld
 systemctl status flanneld</pre>
 </div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<div class="title">Note</div>
+</td>
+<td class="content">
+If flannel bridge has been established then you should be able to ping those nodes.
+</td>
+</tr>
+</table>
+</div>
+<div class="paragraph">
+<p>Do add the below line in the /etc/sysconfig/docker file by substituting the values of bip and mtu. You can get the values of bip and mtu in the env file of flanneld located
+in /var/lib/flanneld. The value of bip is that of FLANNEL_SUBNET and the value of mtu is that of FLANNEL_MTU.</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>DOCKER_OPTS="--bip= --mtu= --iptables=false --ip-masq=false --ip-forward=true"</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>After adding the above line reload the docker daemon and restart it.</p>
 </div>
 <div class="paragraph">
 <p><strong>Kube-apiserver</strong></p>
@@ -1340,26 +1383,6 @@ This should output the version of both the client and the server after the serve
 <pre>Client Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.8", GitCommit:"c138b85178156011dc934c2c9f4837476876fb07", GitTreeState:"clean", BuildDate:"2018-05-21T19:01:12Z", GoVersion:"go1.9.3", Compiler:"gc", Platform:"linux/s390x"}
 Server Version: version.Info{Major:"1", Minor:"9", GitVersion:"v1.9.8", GitCommit:"c138b85178156011dc934c2c9f4837476876fb07", GitTreeState:"clean", BuildDate:"2018-05-21T18:53:18Z", GoVersion:"go1.9.3", Compiler:"gc", Platform:"linux/s390x"}</pre>
 </div>
-</div>
-<div class="paragraph">
-<p>For monitoring logs of kube-apiserver (optional)</p>
-</div>
-<div class="literalblock">
-<div class="content">
-<pre>journalctl -fu kube-apiserver</pre>
-</div>
-</div>
-<div class="admonitionblock note">
-<table>
-<tr>
-<td class="icon">
-<div class="title">Note</div>
-</td>
-<td class="content">
-Monitor the logs when REST calls get exchange which indicates that the server has started.
-</td>
-</tr>
-</table>
 </div>
 <div class="paragraph">
 <p><strong>Setting up Kube-scheduler</strong></p>
@@ -1571,11 +1594,76 @@ accordingly.
 <div class="paragraph">
 <p>Now the kubernetes cluster is ready. Let&#8217;s deploy nginx app.</p>
 </div>
+<div class="paragraph">
+<p>Run nginx</p>
+</div>
 <div class="literalblock">
 <div class="content">
-<pre>kubectl run nginx --image=nginx
-kubectl get pods
-kubectl delete deployment nginx</pre>
+<pre>kubectl run nginx --image=nginx</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>See pod information</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>kubectl get pods -o wide</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Tests to be done on the worker node</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>ping &lt;POD_IP&gt;</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>There should not be any packet loss</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>curl http://&lt;POD_IP&gt;</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Output</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;title&gt;Welcome to nginx!&lt;/title&gt;
+&lt;style&gt;
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;h1&gt;Welcome to nginx!&lt;/h1&gt;
+&lt;p&gt;If you see this page, the nginx web server is successfully installed and
+working. Further configuration is required.&lt;/p&gt;
+
+&lt;p&gt;For online documentation and support please refer to
+&lt;a href="http://nginx.org/"&gt;nginx.org&lt;/a&gt;.&lt;br/&gt;
+Commercial support is available at
+&lt;a href="http://nginx.com/"&gt;nginx.com&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;&lt;em&gt;Thank you for using nginx.&lt;/em&gt;&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;</pre>
+</div>
+</div>
+<div class="paragraph">
+<p>If you want to remove the deployment</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>kubectl delete deployment nginx</pre>
 </div>
 </div>
 </div>
@@ -1799,6 +1887,14 @@ kubectl create -f https://k8s.io/examples/admin/dns/busybox.yaml</pre>
 </div>
 </div>
 <div class="sect1">
+<h2 id="_trroubleshooting_options">Trroubleshooting options</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>To view the latest logs of any service use journalctl -u &lt;service_name&gt; and press <strong>shift + G</strong> to view the latest logs.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
 <h2 id="_references">References</h2>
 <div class="sectionbody">
 <div class="olist arabic">
@@ -1837,7 +1933,7 @@ kubectl create -f https://k8s.io/examples/admin/dns/busybox.yaml</pre>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2018-08-06 08:44:13 IST
+Last updated 2018-08-07 18:39:06 IST
 </div>
 </div>
 </body>
