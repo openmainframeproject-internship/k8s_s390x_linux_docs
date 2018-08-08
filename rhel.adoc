@@ -342,12 +342,11 @@ scp -i <path_where_your_worker_keys_are> kubeworker.novalocal-worker.kubeconfig 
 == Etcd
 
 *About etcd*
-....
+
 It is a distributed storage device used to store the state of the cluster. All other components are stateless. A state is stored in the
 form of key-value pair.
-....
 
-Installation
+Package Installation
 
 ....
 yum install etcd
