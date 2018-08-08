@@ -1,7 +1,7 @@
 = How to  deploy a Kubernetes cluster on RHEL 7.4 flavour of LinuxONE instances?
 
-For this documentation two VMS has been used for deployment and testing pupose. One can extend it to any number of worker nodes.
-Out of these two VMs one acts as master and other acts as slave. Create two instances on LinuxONE community cloud and ssh using the respective keys.
+For this documentation two LinuxONE instances has been used for deployment and testing pupose. One can extend it to any number of worker nodes.
+Out of these two instances one acts as master and other acts as slave. Create two instances on LinuxONE community cloud and ssh using the respective keys.
 
 
 A kubernetes cluster consists of these essential components
@@ -111,7 +111,7 @@ for improving  performance.
 swapoff -a
 ....
 
-Also  comment the entries related to swap space in  /etc/fstab file so that
+Also,  comment the entries related to swap space in  /etc/fstab file so that
 after a reboot also the swap space remains disabled. You can open the file and
 comment the swap related lines or use the below command.
 
@@ -340,6 +340,7 @@ scp -i <path_where_your_worker_keys_are> kubeworker.novalocal-worker.kubeconfig 
 ....
 
 == Etcd
+
 *About etcd*
 ....
 It is a distributed storage device used to store the state of the cluster. All other components are stateless. A state is stored in the
@@ -394,7 +395,7 @@ LimitNOFILE=65536
 WantedBy=multi-user.target
 ....
 
-Modify the configuration file in the /etc/etcd/etcd.conf and it should look like this after all the modifications. But do note to change the ip address.
+Modify the configuration file in the */etc/etcd/etcd.conf* and it should look like this after all the modifications. But do note to change the ip address.
 
 ....
 #[Member]
@@ -523,7 +524,7 @@ rm -rf /usr/lib/systemd/system/docker*  && /etc/systemd/system/docker.service.d/
 
 Make an empty file in */etc/sysconfig/* with name *docker* so later you can add the docker configuration options.
 
-Now create both of the following files in /etc/systemd/system/
+Now create both of the following files in the /etc/systemd/system/ folder.
 
 *docker.service*
 ....
@@ -571,7 +572,7 @@ Reload configuration, remove the previous symbolic links, form new ones
 systemctl daemon-reload && systemctl disable docker.service && systemctl enable docker.service
 ....
 
-Run these two below commands so that non-root user will be able to use docker.
+Run these two below commands so that a non-root user will be able to use docker.
 ....
 groupadd docker
 ....
@@ -602,7 +603,7 @@ Flannel does use etcd for mapping subnet to host. So by running the below comman
 etcdctl --endpoints https://148.100.98.173:2379 --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'
 ....
 
-Your /etc/sysconfig/flanneld file should look like this but you need to replace your etcd endpoints.
+Your */etc/sysconfig/flanneld* file should look like this but you need to replace your etcd endpoints.
 
 ....
 # Flanneld configuration options
@@ -612,7 +613,6 @@ FLANNEL_ETCD_ENDPOINTS="https://148.100.98.173:2379"
 
 # etcd config key.  This is the configuration key that flannel queries
 # For address range assignment
-#FLANNEL_ETCD_PREFIX="/coreos.com/network"
 FLANNEL_ETCD_KEY="/coreos.com/network"
 
 # Any additional options that you want to pass
@@ -795,6 +795,7 @@ etcd-0               Healthy   {"health": "true"}
 ....
 
 *kubelet*
+
 Its role is to run the pods on the worker node.
 
 *Setting up Kubelet as a systemd service*
@@ -947,7 +948,6 @@ To view the latest logs of any service use journalctl -u <service_name> and pres
 3. https://icicimov.github.io/blog/kubernetes/Kubernetes-cluster-step-by-step/
 4. https://kubernetes.io/docs/setup/scratch/
 5. https://docs.docker.com/install/linux/linux-postinstall/
-6. https://github.com/kelseyhightower/kubernetes-the-hard-way/blob/master/deployments/kube-dns.yaml
-7. https://docs.platform9.com/support/disabling-swap-kubernetes-node/
-8. https://serverfault.com/questions/881517/why-disable-swap-on-kubernetes
-9. https://github.com/anujajakhade/anuja/wiki/Docker-on-RHEL
+6. https://docs.platform9.com/support/disabling-swap-kubernetes-node/
+7. https://serverfault.com/questions/881517/why-disable-swap-on-kubernetes
+8. https://github.com/anujajakhade/anuja/wiki/Docker-on-RHEL
