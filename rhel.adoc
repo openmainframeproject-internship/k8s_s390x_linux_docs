@@ -250,7 +250,7 @@ openssl req -new -key kube-proxy-key.pem -out kube-proxy.csr -subj "/CN=kube-pro
 openssl x509 -req -in kube-proxy.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out kube-proxy.pem -days 7200
 ....
 
-*Worker cetificates*
+*Worker certificates*
 ....
 openssl genrsa -out kubeworker.novalocal-worker-key.pem 2048
 WORKER_IP=148.100.98.174 openssl req -new -key kubeworker.novalocal-worker-key.pem -out kubeworker.novalocal-worker.csr -subj "/CN=system:node:kubeworker.novalocal" -config worker-openssl.cnf
