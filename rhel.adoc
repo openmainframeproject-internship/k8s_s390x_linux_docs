@@ -1,4 +1,4 @@
-= How to  deploy a Kubernetes cluster on RHEL 7.4 flavour of LinuxONE instances?
+= How to  deploy a Kubernetes cluster on RHEL 7.5 flavour of LinuxONE instances?
 
 For this documentation two LinuxONE instances has been used for deployment and testing pupose. One can extend it to any number of worker nodes.
 Out of these two instances one acts as master and other acts as slave. Create two instances on LinuxONE community cloud and ssh using the respective keys.
