@@ -218,9 +218,10 @@ openssl req -new -key admin-key.pem -out admin.csr -subj "/CN=admin"
 openssl x509 -req -in admin.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out admin.pem -days 7200
 ....
 
+*Openssl Config for generating certificates for worker node*
+
 NOTE: If you have more than one worker node then add their ip addressess in the below configuration file as IP.2= , IP.3= ...
 
-*Openssl Config for generating certificates for worker node*
 ....
 cat > worker_openssl.cnf << EOF
 [req]
