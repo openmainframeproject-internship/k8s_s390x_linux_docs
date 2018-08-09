@@ -24,7 +24,7 @@ The following components have been used.
 |Component
 |Version
 |Instances
-|RHEL 7.4 flavour of L1CC
+|RHEL 7.5 flavour of L1CC
 |ETCD
 |3.2.22
 |Docker CE
@@ -220,8 +220,6 @@ openssl x509 -req -in admin.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -ou
 
 *Openssl Config for generating certificates for worker node*
 
-NOTE: If you have more than one worker node then add their ip addressess in the below configuration file as IP.2= , IP.3= ...
-
 ....
 cat > worker_openssl.cnf << EOF
 [req]
@@ -236,6 +234,9 @@ subjectAltName = @alt_names
 IP.1 = 148.100.98.174
 EOF
 ....
+
+NOTE: If you have more than one worker node then add their ip addressess in the below configuration file as IP.2= , IP.3= ...
+
 
 *Kubelet certificates*
 ....
@@ -888,7 +889,7 @@ Now the kubernetes cluster is ready. Let's deploy nginx app.
 
 Run nginx
 ....
-kubectl run nginx --image=nginx
+kubectl create deployment nginx --image=nginx
 ....
 
 See pod information
