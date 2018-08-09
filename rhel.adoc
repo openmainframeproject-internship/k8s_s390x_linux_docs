@@ -32,7 +32,7 @@ The following components have been used.
 |Kubernetes
 |1.9.8
 |Flannel
-|0.7.1
+|0.10.0
 |===
 
 == Prerequisites
