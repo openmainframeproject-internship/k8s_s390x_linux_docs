@@ -940,8 +940,8 @@ kubectl delete deployment nginx
 ....
 
 
-== Trroubleshooting options
-To view the latest logs of any service use journalctl -u <service_name> and press *shift + G* to view the latest logs.
+== Troubleshooting options
+To view the latest logs of any service use journalctl -u <service_name> and press *shift + G* to view the latest entries in the log.
 
 == References
 
