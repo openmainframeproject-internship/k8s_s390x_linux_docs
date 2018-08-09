@@ -45,7 +45,7 @@ Also copy the worker node keys to the master node because you will need them to 
 scp -i master.pem <PATH_OF_WORKER_NODES>/{worker1.pem,worker2.pem} root@148.100.98.174:/root
 ....
 
-After you ssh into your instance check the rhel version using the below command and wait for some time. Now do rerun the same command the rhel version gets updated.
+After you ssh into your instance check the rhel version using the below command and wait for some time. Now  rerun the same command, the rhel version gets updated.
 
 ....
 cat /etc/os-release
