@@ -697,7 +697,11 @@ systemctl start kube-apiserver
 systemctl status kube-apiserver
 ....
 
-*kubectl version*
+*Verify kubectl version*
+
+....
+kubectl command?
+....
 
 Output
 
