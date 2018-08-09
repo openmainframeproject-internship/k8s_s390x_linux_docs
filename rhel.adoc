@@ -699,10 +699,10 @@ systemctl start kube-apiserver
 systemctl status kube-apiserver
 ....
 
-*Verify kubectl version*
+Run the following command to check the kubectl version and it also ensures that the server has been connected it you see the server version.
 
 ....
-kubectl command?
+kubectl version
 ....
 
 Output
@@ -754,21 +754,21 @@ Documentation=https://github.com/kubernetes/kubernetes
 
 [Service]
 ExecStart=/usr/bin/kube-controller-manager \\
-    --address=0.0.0.0 \\
-    --allocate-node-cidrs=true \\
-  	--attach-detach-reconcile-sync-period=1m0s \\
-  	--cluster-cidr=100.64.0.0/16 \\
-  	--cluster-name=k8s.virtual.local \\
-    --cluster-signing-cert-file=/srv/kubernetes/ca.pem \\
-    --cluster-signing-key-file=/srv/kubernetes/ca-key.pem \\
-    --configure-cloud-routes=false \\
-    --kubeconfig=/var/lib/kube-controller-manager/kubeconfig \\
-  	--leader-elect=true \\
-    --master=https://148.100.98.173:6443 \\
-  	--root-ca-file=/srv/kubernetes/ca.pem \\
-  	--service-account-private-key-file=/srv/kubernetes/apiserver-key.pem \\
-    --service-cluster-ip-range=100.65.0.0/24 \\
-    --use-service-account-credentials=true
+      --address=0.0.0.0 \\
+      --allocate-node-cidrs=true \\
+      --attach-detach-reconcile-sync-period=1m0s \\
+      --cluster-cidr=100.64.0.0/16 \\
+      --cluster-name=k8s.virtual.local \\
+      --cluster-signing-cert-file=/srv/kubernetes/ca.pem \\
+      --cluster-signing-key-file=/srv/kubernetes/ca-key.pem \\
+      --configure-cloud-routes=false \\
+      --kubeconfig=/var/lib/kube-controller-manager/kubeconfig \\
+      --leader-elect=true \\
+      --master=https://148.100.98.173:6443 \\
+      --root-ca-file=/srv/kubernetes/ca.pem \\
+      --service-account-private-key-file=/srv/kubernetes/apiserver-key.pem \\
+      --service-cluster-ip-range=100.65.0.0/24 \\
+      --use-service-account-credentials=true
 Restart=on-failure
 RestartSec=10
 
