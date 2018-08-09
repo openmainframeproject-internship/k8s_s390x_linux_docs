@@ -45,10 +45,10 @@ Also copy the worker node keys to the master node because you will need them to 
 scp -i master.pem <PATH_OF_WORKER_NODES>/{worker1.pem,worker2.pem} root@148.100.98.174:/root
 ....
 
-Do this to boot using the latest kernel and reboot after this step
+After you ssh into your instance check the rhel version using the below command and wait for some time. Now do rerun the same command the rhel version gets updated.
 
 ....
-mv /etc/yum.repos.d/rhel7.repo /root
+cat /etc/os-release
 ....
 
 To be able to download packages you need to register your instance and for that you need a RHEL account. Also enable the repos from which you can download
@@ -595,7 +595,8 @@ So by this overlay network each container gets an IP and this makes the containe
 they can use the docker bridge otherwise they use the encaptulation and UDP in order to communicate with each other.
 
 ....
-yum install flannel
+curl -# -L -o /usr/bin/flanneld https://github.com/coreos/flannel/releases/download/v0.10.0/flanneld-s390x
+chmod +x /usr/bin/flanneld
 ....
 
 Flannel does use etcd for mapping subnet to host. So by running the below command etcd will know that flannel will use it's service.
@@ -603,25 +604,34 @@ Flannel does use etcd for mapping subnet to host. So by running the below comman
 etcdctl --endpoints https://148.100.98.173:2379 --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'
 ....
 
-Your */etc/sysconfig/flanneld* file should look like this but you need to replace your etcd endpoints.
+Create a flannel service file with your etcd endpoints.
 
 ....
-# Flanneld configuration options
+cat > /etc/systemd/system/flanneld.service << EOF
+[Unit]
+Description=Network fabric for containers
+Documentation=https://github.com/coreos/flannel
+After=network.target
+After=network-online.target
+Wants=network-online.target
+After=etcd.service
+Before=docker.service
 
-# etcd url location.  Point this to the server where etcd runs
-FLANNEL_ETCD_ENDPOINTS="https://148.100.98.173:2379"
+[Service]
+Type=notify
+Restart=always
+RestartSec=5
+ExecStart= /usr/bin/flanneld \\
+  -etcd-endpoints=https://148.100.98.173:2379 \\
+  -ip-masq=true \\
+  -subnet-file=/var/lib/flanneld/subnet.env \\
+  -etcd-cafile=/srv/kubernetes/ca.pem \\
+  -etcd-certfile=/srv/kubernetes/etcd.crt \\
+  -etcd-keyfile=/srv/kubernetes/etcd.key
 
-# etcd config key.  This is the configuration key that flannel queries
-# For address range assignment
-FLANNEL_ETCD_KEY="/coreos.com/network"
-
-# Any additional options that you want to pass
-
-FLANNEL_OPTIONS=" -subnet-file=/var/lib/flanneld/subnet.env \
--etcd-cafile=/srv/kubernetes/ca.pem \
--etcd-certfile=/srv/kubernetes/etcd.crt \
--etcd-keyfile=/srv/kubernetes/etcd.key \
--ip-masq=true"
+[Install]
+WantedBy=multi-user.target
+EOF
 ....
 
 *Commands to start, check status flanneld*
@@ -632,7 +642,7 @@ systemctl start flanneld
 systemctl status flanneld
 ....
 
-NOTE: If flannel bridge has been established then you should be able to ping those nodes.
+NOTE: If flannel bridge has been established then you should be able to ping one flannel node from another.
 
 Do add the below line in the /etc/sysconfig/docker file by substituting the values of bip and mtu. You can get the values of bip and mtu in the env file of flanneld located
 in /var/lib/flanneld. The value of bip is that of FLANNEL_SUBNET and the value of mtu is that of FLANNEL_MTU.

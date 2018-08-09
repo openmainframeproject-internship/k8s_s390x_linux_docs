@@ -520,11 +520,11 @@ All the commands have been run as root user. There may permission issues at some
 </div>
 </div>
 <div class="paragraph">
-<p>Do this to boot using the latest kernel and reboot after this step</p>
+<p>After you ssh into your instance check the rhel version using the below command and wait for some time. Now do rerun the same command the rhel version gets updated.</p>
 </div>
 <div class="literalblock">
 <div class="content">
-<pre>mv /etc/yum.repos.d/rhel7.repo /root</pre>
+<pre>cat /etc/os-release</pre>
 </div>
 </div>
 <div class="paragraph">
@@ -1225,7 +1225,8 @@ they can use the docker bridge otherwise they use the encaptulation and UDP in o
 </div>
 <div class="literalblock">
 <div class="content">
-<pre>yum install flannel</pre>
+<pre>curl -# -L -o /usr/bin/flanneld https://github.com/coreos/flannel/releases/download/v0.10.0/flanneld-s390x
+chmod +x /usr/bin/flanneld</pre>
 </div>
 </div>
 <div class="paragraph">
@@ -1237,26 +1238,35 @@ they can use the docker bridge otherwise they use the encaptulation and UDP in o
 </div>
 </div>
 <div class="paragraph">
-<p>Your <strong>/etc/sysconfig/flanneld</strong> file should look like this but you need to replace your etcd endpoints.</p>
+<p>Create a flannel service file with your etcd endpoints.</p>
 </div>
 <div class="literalblock">
 <div class="content">
-<pre># Flanneld configuration options
+<pre>cat &gt; /etc/systemd/system/flanneld.service &lt;&lt; EOF
+[Unit]
+Description=Network fabric for containers
+Documentation=https://github.com/coreos/flannel
+After=network.target
+After=network-online.target
+Wants=network-online.target
+After=etcd.service
+Before=docker.service
 
-# etcd url location.  Point this to the server where etcd runs
-FLANNEL_ETCD_ENDPOINTS="https://148.100.98.173:2379"
+[Service]
+Type=notify
+Restart=always
+RestartSec=5
+ExecStart= /usr/bin/flanneld \\
+  -etcd-endpoints=https://148.100.98.173:2379 \\
+  -ip-masq=true \\
+  -subnet-file=/var/lib/flanneld/subnet.env \\
+  -etcd-cafile=/srv/kubernetes/ca.pem \\
+  -etcd-certfile=/srv/kubernetes/etcd.crt \\
+  -etcd-keyfile=/srv/kubernetes/etcd.key
 
-# etcd config key.  This is the configuration key that flannel queries
-# For address range assignment
-FLANNEL_ETCD_KEY="/coreos.com/network"
-
-# Any additional options that you want to pass
-
-FLANNEL_OPTIONS=" -subnet-file=/var/lib/flanneld/subnet.env \
--etcd-cafile=/srv/kubernetes/ca.pem \
--etcd-certfile=/srv/kubernetes/etcd.crt \
--etcd-keyfile=/srv/kubernetes/etcd.key \
--ip-masq=true"</pre>
+[Install]
+WantedBy=multi-user.target
+EOF</pre>
 </div>
 </div>
 <div class="paragraph">
@@ -1276,7 +1286,7 @@ systemctl status flanneld</pre>
 <div class="title">Note</div>
 </td>
 <td class="content">
-If flannel bridge has been established then you should be able to ping those nodes.
+If flannel bridge has been established then you should be able to ping one flannel node from another.
 </td>
 </tr>
 </table>
@@ -1701,7 +1711,7 @@ Commercial support is available at
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2018-08-09 07:26:52 IST
+Last updated 2018-08-10 00:14:22 IST
 </div>
 </div>
 </body>
