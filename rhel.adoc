@@ -307,10 +307,9 @@ kubectl config use-context linux1.k8s
 cat ~/.kube/config
 ....
 
-*kube-controller kubeconfig*
+*kube-controller-manager kubeconfig*
 
 ....
-mkdir -p /var/lib/kube-controller-manager
 TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.98.173:6443 --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
 kubectl config set-credentials kube-controller-manager --client-certificate=/srv/kubernetes/kube-controller-manager.pem --client-key=/srv/kubernetes/kube-controller-manager-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/var/lib/kube-controller-manager/kubeconfig
@@ -320,7 +319,6 @@ kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=kube-controlle
 *kube-scheduler kubeconfig*
 
 ....
-mkdir -p /var/lib/kube-scheduler
 TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.98.173:6443 --kubeconfig=/var/lib/kube-scheduler/kubeconfig
 kubectl config set-credentials kube-scheduler --client-certificate=/srv/kubernetes/kube-scheduler.pem --client-key=/srv/kubernetes/kube-scheduler-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/var/lib/kube-scheduler/kubeconfig
@@ -405,8 +403,8 @@ Modify the configuration file in the */etc/etcd/etcd.conf* and it should look li
 #ETCD_CORS=""
 ETCD_DATA_DIR="/var/lib/etcd/default.etcd"
 #ETCD_WAL_DIR=""
-ETCD_LISTEN_PEER_URLS="http://148.100.98.173:2380"
-ETCD_LISTEN_CLIENT_URLS="http://148.100.98.173:2379"
+ETCD_LISTEN_PEER_URLS="https://148.100.98.173:2380"
+ETCD_LISTEN_CLIENT_URLS="https://148.100.98.173:2379"
 #ETCD_MAX_SNAPSHOTS="5"
 #ETCD_MAX_WALS="5"
 ETCD_NAME="default"
@@ -420,14 +418,14 @@ ETCD_NAME="default"
 #ETCD_GRPC_KEEPALIVE_TIMEOUT="20s"
 #
 #[Clustering]
-ETCD_INITIAL_ADVERTISE_PEER_URLS="http://148.100.98.173:2380"
-ETCD_ADVERTISE_CLIENT_URLS="http://148.100.98.173:2379"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="https://148.100.98.173:2380"
+ETCD_ADVERTISE_CLIENT_URLS="https://148.100.98.173:2379"
 #ETCD_DISCOVERY=""
 #ETCD_DISCOVERY_FALLBACK="proxy"
 #ETCD_DISCOVERY_PROXY=""
 #ETCD_DISCOVERY_SRV=""
-ETCD_INITIAL_CLUSTER="default=http://148.100.98.173:2380"
-ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster"
+ETCD_INITIAL_CLUSTER="default=https://148.100.98.173:2380"
+ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster-0"
 ETCD_INITIAL_CLUSTER_STATE="new"
 #ETCD_STRICT_RECONFIG_CHECK="true"
 #ETCD_ENABLE_V2="true"
@@ -441,16 +439,16 @@ ETCD_INITIAL_CLUSTER_STATE="new"
 #ETCD_PROXY_READ_TIMEOUT="0"
 #
 #[Security]
-#ETCD_CERT_FILE="/srv/kubernetes/etcd.crt"
-#ETCD_KEY_FILE="/srv/kubernetes/etcd.key"
-#ETCD_CLIENT_CERT_AUTH="true"
-#ETCD_TRUSTED_CA_FILE="/srv/kubernetes/ca.pem"
-#ETCD_AUTO_TLS="false"
-#ETCD_PEER_CERT_FILE="/srv/kubernetes/etcd.crt"
-#ETCD_PEER_KEY_FILE="/srv/kubernetes/etcd.key"
-#ETCD_PEER_CLIENT_CERT_AUTH="true"
+ETCD_CERT_FILE="/srv/kubernetes/etcd.crt"
+ETCD_KEY_FILE="/srv/kubernetes/etcd.key"
+ETCD_CLIENT_CERT_AUTH="true"
+ETCD_TRUSTED_CA_FILE="/srv/kubernetes/ca.pem"
+ETCD_AUTO_TLS="false"
+ETCD_PEER_CERT_FILE="/srv/kubernetes/etcd.crt"
+ETCD_PEER_KEY_FILE="/srv/kubernetes/etcd.key"
+ETCD_PEER_CLIENT_CERT_AUTH="true"
 #ETCD_PEER_TRUSTED_CA_FILE=""
-#ETCD_PEER_AUTO_TLS="false"
+ETCD_PEER_AUTO_TLS="false"
 #
 #[Logging]
 ETCD_DEBUG="true"
@@ -521,7 +519,7 @@ You need not install *Docker CE* because it is present in /usr/local/bin folder.
 So remove the existing service file and create a new one.
 
 ....
-rm -rf /usr/lib/systemd/system/docker*  && /etc/systemd/system/docker.service.d/
+rm -rf /usr/lib/systemd/system/docker*
 ....
 
 Make an empty file in */etc/sysconfig/* with name *docker* so later you can add the docker configuration options.
@@ -602,6 +600,7 @@ chmod +x /usr/bin/flanneld
 ....
 
 Flannel does use etcd for mapping subnet to host. So by running the below command etcd will know that flannel will use it's service.
+Do this on the master node only as etcd is running on the master.
 ....
 etcdctl --endpoints https://148.100.98.173:2379 --cert-file /srv/kubernetes/etcd.crt --key-file /srv/kubernetes/etcd.key --ca-file /srv/kubernetes/ca.pem set /coreos.com/network/config '{ "Network": "100.64.0.0/16", "SubnetLen": 24, "Backend": {"Type": "vxlan"} }'
 ....
@@ -644,13 +643,17 @@ systemctl start flanneld
 systemctl status flanneld
 ....
 
-NOTE: If flannel bridge has been established then you should be able to ping one flannel node from another.
+NOTE: If flannel bridge has been established then you should be able to ping one flannel node from another but before you do that flush your iptables.
 
-Do add the below line in the /etc/sysconfig/docker file by substituting the values of bip and mtu. You can get the values of bip and mtu in the env file of flanneld located
+Do add the below line  by substituting the values of bip and mtu to the docker execstart of docker service. You can get the values of bip and mtu in the env file of flanneld located
 in /var/lib/flanneld. The value of bip is that of FLANNEL_SUBNET and the value of mtu is that of FLANNEL_MTU.
 
 ....
-DOCKER_OPTS="--bip= --mtu= --iptables=false --ip-masq=false --ip-forward=true"
+--bip= --mtu= --iptables=false --ip-masq=false --ip-forward=true"
+....
+
+....
+ip link del docker0
 ....
 
 After adding the above line reload the docker daemon and restart it.
@@ -830,7 +833,7 @@ ExecStart=/usr/bin/kubelet \\
   --cluster-dns=100.65.0.10 \\
   --cluster-domain=cluster.local \\
   --container-runtime=docker \\
-  --kubeconfig=/var/lib/kubelet/kubeconfig \\
+  --kubeconfig=/var/lib/kubelet/kubelet.kubeconfig \\
   --serialize-image-pulls=false \\
   --register-node=true \\
   --tls-cert-file=/srv/kubernetes/kubelet.pem \\
@@ -862,6 +865,7 @@ Documentation=https://github.com/kubernetes/kubernetes
 [Service]
 ExecStart=/usr/bin/kube-proxy \\
   --cluster-cidr=100.64.0.0/16 \\
+  --kubeconfig=/var/lib/kubelet/kubelet.kubeconfig \\
   --masquerade-all=true \\
   --proxy-mode=iptables
 Restart=on-failure
