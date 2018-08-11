@@ -438,7 +438,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <span id="author" class="author">Rajula Vineet Reddy</span><br>
 <span id="email" class="email"><a href="mailto:rajula96reddy@gmail.com">rajula96reddy@gmail.com</a></span><br>
 <span id="revnumber">version 2.0,</span>
-<span id="revdate">2018-07-31</span>
+<span id="revdate">2018-08-11</span>
 </div>
 <div id="toc" class="toc2">
 <div id="toctitle">Table of Contents</div>
@@ -1176,6 +1176,15 @@ FLANNEL_OPTIONS="-iface=eth0 -subnet-file=/var/lib/flanneld/subnet.env \
 <p>The 'iface' here should be the interface through which the nodes communicate and flannel will
 be configured for this interface.</p>
 </div>
+<div class="paragraph">
+<p>Start the flannel daemon using the following commands</p>
+</div>
+<div class="literalblock">
+<div class="content">
+<pre>sudo systemctl enable flanneld
+sudo systemctl start flanneld</pre>
+</div>
+</div>
 <div class="sect3">
 <h4 id="_configure_docker_settings">Configure Docker Settings</h4>
 <div class="paragraph">
@@ -1204,9 +1213,7 @@ the variable <em>FLANNEL_MTU</em> in the above file.</p>
 <div class="literalblock">
 <div class="content">
 <pre>sudo systemctl daemon-reload
-sudo systemctl restart docker
-sudo systemctl enable flanneld
-sudo systemctl start flanneld</pre>
+sudo systemctl restart docker</pre>
 </div>
 </div>
 </div>
@@ -1532,7 +1539,8 @@ curl http://100.64.80.1 #The IP of any of the nginx pod from the above command
 <div class="paragraph">
 <p>I will use the following yaml derived from the official kubernetes repository,
 made some changes (which are highlighted in red). Make sure the clusterIP here
-is same as what we provide as parameters to the Kubernetes components.</p>
+is same as what we provide as parameters to the Kubernetes components. The yaml file can be directly download
+from <a href="https://github.com/rajula96reddy/LinuxOne_Kubernetes_SLES_Deployment_Documentation/blob/master/kube-dns.yaml">here</a>.</p>
 </div>
 <div class="literalblock">
 <div class="content">
@@ -1827,7 +1835,7 @@ of the service using <code><code>journalctl -fu &lt;service name&gt;</code></cod
 <div id="footer">
 <div id="footer-text">
 Version 2.0<br>
-Last updated 2018-08-01 01:17:16 IST
+Last updated 2018-08-11 15:31:27 IST
 </div>
 </div>
 </body>

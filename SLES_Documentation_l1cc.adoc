@@ -1,6 +1,6 @@
 = Installing Kubernetes on LinuxOne - SUSE Linux Enterprise Server Distribution
 Rajula Vineet Reddy <rajula96reddy@gmail.com>
-v2.0, 2018-07-31
+v2.0, 2018-08-11
 :toc: left
 
 *Note:* This setup documents running a two node (1 Master & 1 Worker) Kubernetes Cluster
@@ -468,6 +468,12 @@ FLANNEL_OPTIONS="-iface=eth0 -subnet-file=/var/lib/flanneld/subnet.env \
 The 'iface' here should be the interface through which the nodes communicate and flannel will
 be configured for this interface.
 
+Start the flannel daemon using the following commands
+....
+sudo systemctl enable flanneld
+sudo systemctl start flanneld
+....
+
 #### Configure Docker Settings
 Modify the docker configuration file ``/etc/sysconfig/docker`` to
 add extra arguments for docker executable as follows
@@ -488,8 +494,6 @@ Then run the following commands
 ....
 sudo systemctl daemon-reload
 sudo systemctl restart docker
-sudo systemctl enable flanneld
-sudo systemctl start flanneld
 ....
 ### Testing flanneld
 Once *flanneld* is started and *docker* daemon is restarted, running ```route -n``` on Master node
@@ -730,7 +734,8 @@ curl http://100.64.80.1 #The IP of any of the nginx pod from the above command
 ## Setting up Kube-dns
 I will use the following yaml derived from the official kubernetes repository,
 made some changes (which are highlighted in red). Make sure the clusterIP here
-is same as what we provide as parameters to the Kubernetes components.
+is same as what we provide as parameters to the Kubernetes components. The yaml file can be directly download
+from https://github.com/rajula96reddy/LinuxOne_Kubernetes_SLES_Deployment_Documentation/blob/master/kube-dns.yaml[here].
 [subs="quotes"]
 ....
 # Copyright 2016 The Kubernetes Authors.
