@@ -1,6 +1,6 @@
 = Installing Kubernetes on LinuxOne - Canonical Distribution
 Rajula Vineet Reddy <rajula96reddy@gmail.com>
-v2.0, 2018-07-31
+v2.0, 2018-08-11
 :toc: left
 
 *Note:* This setup documents running a two node (1 Master & 1 Worker) Kubernetes Cluster
@@ -776,7 +776,8 @@ curl http://148.100.99.100:${NODE_PORT} #The IP is of Worker node
 ## Setting up Kube-dns
 I will use the following yaml derived from the official kubernetes repository,
 made some changes (which are highlighted in red). Make sure the clusterIP here
-is same as what we provide as parameters to the Kubernetes components.
+is same as what we provide as parameters to the Kubernetes components. The yaml file can be directly download
+from https://github.com/rajula96reddy/LinuxOne_Kubernetes_Canonical_Deployment_Documentation/blob/master/kube-dns.yaml[here].
 [subs="quotes"]
 ....
 # Copyright 2016 The Kubernetes Authors.
