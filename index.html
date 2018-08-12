@@ -438,7 +438,7 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <span id="author" class="author">Rajula Vineet Reddy</span><br>
 <span id="email" class="email"><a href="mailto:rajula96reddy@gmail.com">rajula96reddy@gmail.com</a></span><br>
 <span id="revnumber">version 2.0,</span>
-<span id="revdate">2018-08-11</span>
+<span id="revdate">2018-08-12</span>
 </div>
 <div id="toc" class="toc2">
 <div id="toctitle">Table of Contents</div>
@@ -948,11 +948,11 @@ kubectl config use-context linux1.k8s --kubeconfig=/var/lib/kube-scheduler/kubec
 <div class="literalblock">
 <div class="content">
 <pre>TOKEN=$(dd if=/dev/urandom bs=128 count=1 2&gt;/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2&gt;/dev/null)
-kubectl config set-cluster linux1.k8s --certificate-authority=/root/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.99.99:6443 --kubeconfig=/root/srv/kubernetes/k8sworker-worker.kubeconfig
-kubectl config set-credentials k8sworker --client-certificate=/root/srv/kubernetes/k8sworker-worker.pem --client-key=/root/srv/kubernetes/k8sworker-worker-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/root/srv/kubernetes/k8sworker-worker.kubeconfig
-kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=k8sworker --kubeconfig=/root/srv/kubernetes/k8sworker-worker.kubeconfig
-kubectl config use-context linux1.k8s --kubeconfig=/root/srv/kubernetes/k8sworker-worker.kubeconfig
-scp k8sworker-worker.kubeconfig root@148.100.10.16:/root/srv/kubernetes/kubelet.kubeconfig</pre>
+kubectl config set-cluster linux1.k8s --certificate-authority=/srv/kubernetes/ca.pem --embed-certs=true --server=https://148.100.99.99:6443 --kubeconfig=/srv/kubernetes/k8sworker-worker.kubeconfig
+kubectl config set-credentials k8sworker --client-certificate=/srv/kubernetes/k8sworker-worker.pem --client-key=/srv/kubernetes/k8sworker-worker-key.pem --embed-certs=true --token=$TOKEN --kubeconfig=/srv/kubernetes/k8sworker-worker.kubeconfig
+kubectl config set-context linux1.k8s --cluster=linux1.k8s --user=k8sworker --kubeconfig=/srv/kubernetes/k8sworker-worker.kubeconfig
+kubectl config use-context linux1.k8s --kubeconfig=/srv/kubernetes/k8sworker-worker.kubeconfig
+scp k8sworker-worker.kubeconfig root@148.100.10.16:/srv/kubernetes/kubelet.kubeconfig</pre>
 </div>
 </div>
 </div>
@@ -1835,7 +1835,7 @@ of the service using <code><code>journalctl -fu &lt;service name&gt;</code></cod
 <div id="footer">
 <div id="footer-text">
 Version 2.0<br>
-Last updated 2018-08-11 15:31:27 IST
+Last updated 2018-08-12 08:37:19 IST
 </div>
 </div>
 </body>
