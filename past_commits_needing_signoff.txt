@@ -1,0 +1,19 @@
+--
+The following commits were made pursuant to the Developer Certificate of Origin, even though a Signed-off-by: was not included in the commit message.
+
+43686ed Create README.md
+eecfa76 Added link to kube-dns file saved in the repository
+d603757 Installed Etcd using snap and add Kube-dns setup
+5d89f91 Modified 'Downloads' to '/' when downloading and added 'sudo' to hostnamctl
+d37b4a7 Added a new doc which installs using snap
+8254a73 Created new Ubuntu Docs and redirected gh pages to this
+b493b38 Positioned toc to left, Bumped up the version. Made some corrections.
+f271146 Made minor modifications
+e064757 Added compiled html from previous commit doc
+874dd40 Made corrections
+10c1b3f Added swapoff and corrected download links
+4fc217c Improved the Docs. Docs version ~ 1.2
+d60bcb5 Added references and IP's of the nodes. Also, deleted the Ubuntu_Documentation.html file as the output file is now index.html
+12beb39 Clone Ubuntu_Documentation.html as index.html for GIt Pages
+5e4c78b First commit
+--
