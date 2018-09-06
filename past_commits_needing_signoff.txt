@@ -1,0 +1,36 @@
+The following commits were made pursuant to the Developer Certificate of Origin, even though a Signed-off-by: was not included in the commit message.
+
+2e37c2f Add files via upload
+8b906d8 Add files via upload
+2a984a7 Add files via upload
+fecc0f2 Add files via upload
+21a7b48 Add files via upload
+bf8e585 Add files via upload
+39aceba Add files via upload
+3bbaa42 Merge pull request #3 from mfriesenegger/patch-2
+e7569cd Merge pull request #8 from mfriesenegger/patch-7
+604a118 Merge pull request #7 from mfriesenegger/patch-6
+32d7694 Merge pull request #4 from mfriesenegger/patch-3
+dcbf4f9 Merge pull request #9 from mfriesenegger/patch-8
+d0668ed Merge pull request #2 from mfriesenegger/patch-1
+75ca8cb Merge pull request #6 from mfriesenegger/patch-5
+abe7bfd Merge pull request #5 from mfriesenegger/patch-4
+332c4a1 Change slave to worker
+b43a3ff Fix Troubleshooting section
+c20c61f Updates to verify kubectl version
+073e1f7 Are two Output lines needed?
+6f12466 A couple of fixes for the etcd section
+c6d9adb Fix Worker certificates spelling
+4f6e944 Move note
+544e0a9 Update RHEL version
+a9be7f8 Add files via upload
+6cb27a4 Add files via upload
+488f7b9 Add files via upload
+3951bba Add files via upload
+ca810e6 Add files via upload
+63d5541 Add files via upload
+976e9da Add files via upload
+1d2a80a Delete initial
+a670194 Delete git_check.txt
+c2fc4dd Added Readme
+0d9e60e initial commit
