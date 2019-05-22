@@ -1,0 +1,14 @@
+The following commits were made pursuant to the Developer Certificate of Origin, even though a Signed-off-by: was not included in the commit message.
+
+f85d9f5 Corrected path in Kubelet Kubeconfig section
+7f93c4b Added kube-dns file and modified integrating docker and flannel section
+191ba84 Added kube-dns setup and made some corrections
+eee641f Forgot to update the date and the html in the previous commit
+0175bb9 Corrected some bugs and added general info
+8104465 Updated date and bumped up the version of this old doc
+2273273 Create a new doc, which is the index.html, which is not based on kvm
+bdec043 Corrected mistakes in the certificates & config files
+db565bf Made some minor corrections
+eea1759 Created new doc which uses rpm for installation
+b105c1b Added first version. Most of the docs is taken from Canonical docs
+35ccf7e Initial commit
